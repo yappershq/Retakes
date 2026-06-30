@@ -1,0 +1,60 @@
+using System.IO;
+using Microsoft.Extensions.Logging;
+using Sharp.Shared;
+using Sharp.Shared.Managers;
+
+namespace Retakes;
+
+/// <summary>
+/// Single cached gateway to every ModSharp manager the Core plugin needs.
+/// Built once in the plugin ctor; optional external modules resolved in OnAllModulesLoaded.
+/// </summary>
+internal sealed class InterfaceBridge
+{
+    internal static InterfaceBridge Instance { get; private set; } = null!;
+
+    // === Paths ===
+    internal string SharpPath  { get; }
+    internal string ConfigPath { get; }
+    internal string DataPath   { get; }
+
+    // === Managers ===
+    internal IEntityManager  EntityManager  { get; }
+    internal IClientManager  ClientManager  { get; }
+    internal IConVarManager  ConVarManager  { get; }
+    internal IHookManager    HookManager    { get; }
+    internal ISchemaManager  SchemaManager  { get; }
+    internal IEventManager   EventManager   { get; }
+    internal IFileManager    FileManager    { get; }
+
+    // === Services ===
+    internal IModSharp           ModSharp           { get; }
+    internal ILoggerFactory      LoggerFactory      { get; }
+    internal ISharpModuleManager SharpModuleManager { get; }
+    internal IModSharpModule     Module             { get; }
+
+    public InterfaceBridge(IModSharpModule module, ISharedSystem sharedSystem, string sharpPath, ILoggerFactory loggerFactory)
+    {
+        Instance = this;
+        Module   = module;
+
+        SharpPath  = sharpPath;
+        ConfigPath = Path.Combine(sharpPath, "configs", "retakes");
+        DataPath   = Path.Combine(sharpPath, "data",    "retakes");
+
+        Directory.CreateDirectory(ConfigPath);
+        Directory.CreateDirectory(DataPath);
+
+        EntityManager = sharedSystem.GetEntityManager();
+        ClientManager = sharedSystem.GetClientManager();
+        ConVarManager = sharedSystem.GetConVarManager();
+        HookManager   = sharedSystem.GetHookManager();
+        SchemaManager = sharedSystem.GetSchemaManager();
+        EventManager  = sharedSystem.GetEventManager();
+        FileManager   = sharedSystem.GetFileManager();
+
+        ModSharp           = sharedSystem.GetModSharp();
+        LoggerFactory      = loggerFactory;
+        SharpModuleManager = sharedSystem.GetSharpModuleManager();
+    }
+}
