@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Retakes.Announcement;
+using Retakes.Bomb;
 using Retakes.Breaker;
 using Retakes.Config;
 using Retakes.Defuse;
@@ -52,6 +53,10 @@ internal static class ModuleDependencyInjection
 
         services.AddSingleton<ZonesModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<ZonesModule>());
+
+        // C2: bomb auto-plant (must be after RoundFlowModule which sets PlanterSteamId)
+        services.AddSingleton<BombModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<BombModule>());
 
         return services;
     }
