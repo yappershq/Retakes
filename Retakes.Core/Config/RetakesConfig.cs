@@ -37,7 +37,8 @@ public class TeamSettings
 
 public class MapConfigSettings
 {
-    // reserved for Phase B2
+    [JsonPropertyName("enable_bombsite_announcement_center")] public bool EnableBombsiteAnnouncementCenter { get; set; } = true;
+    [JsonPropertyName("enable_bombsite_announcement_voices")] public bool EnableBombsiteAnnouncementVoices { get; set; } = true;
 }
 
 public class BombSettings

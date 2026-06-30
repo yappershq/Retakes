@@ -8,7 +8,7 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
 - [x] **A. Scaffold** — Core/Shared/Database skeleton, IModule+DI, EventBus/IRetakesService. GREEN. commit 9c8d0d4.
 - [x] **B1. State foundation** — config, spawn data, player lifecycle, queue/team. GREEN. (commit below)
 - [x] **B2. Round flow** — RoundFlowModule + fallback alloc + assister scoring. GREEN. Core spine done.
-- [~] **C. Combat round** — BombModule (autoplant), BreakerModule, AnnouncementModule, DefuseModule, ZonesModule.
+- [~] **C. Combat round** — [x] C1 breaker/announce/defuse/zones GREEN; [ ] C2 bomb autoplant.
 - [ ] **D. Allocator** — round types, weapon/nade/armor alloc, prefs DB, menus, votes, CanAcquire.
 - [ ] **E. Spawn editor.**
 - [ ] **F. Review** — anti-pattern pass, README, configs.example, lang, gamedata; create+push public GitHub repo.

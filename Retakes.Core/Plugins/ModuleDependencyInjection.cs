@@ -1,10 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
+using Retakes.Announcement;
+using Retakes.Breaker;
 using Retakes.Config;
+using Retakes.Defuse;
 using Retakes.Modules;
 using Retakes.Player;
 using Retakes.Queue;
 using Retakes.RoundFlow;
 using Retakes.Spawn;
+using Retakes.Zones;
 
 namespace Retakes.Plugins;
 
@@ -36,6 +40,18 @@ internal static class ModuleDependencyInjection
         // B2: fallback weapon allocator (subscribes to OnAllocate in OAM)
         services.AddSingleton<FallbackAllocationModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<FallbackAllocationModule>());
+
+        services.AddSingleton<BreakerModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<BreakerModule>());
+
+        services.AddSingleton<AnnouncementModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<AnnouncementModule>());
+
+        services.AddSingleton<DefuseModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<DefuseModule>());
+
+        services.AddSingleton<ZonesModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<ZonesModule>());
 
         return services;
     }

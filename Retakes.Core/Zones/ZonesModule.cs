@@ -1,0 +1,235 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Retakes.Config;
+using Retakes.Plugins;
+using Retakes.Shared;
+using Sharp.Shared.Enums;
+using Sharp.Shared.HookParams;
+using Sharp.Shared.Listeners;
+using Sharp.Shared.Objects;
+using Sharp.Shared.Types;
+using Sharp.Shared.Units;
+
+namespace Retakes.Zones;
+
+/// <summary>
+/// Loads per-map zone definitions and enforces player bounds each tick via PlayerPostThink.
+/// Green zones restrict players to a planted-side area; red zones push players back.
+/// </summary>
+internal sealed class ZonesModule : IModule, IClientListener
+{
+    private readonly ILogger<ZonesModule> _logger;
+    private readonly InterfaceBridge      _bridge;
+    private readonly ConfigModule         _config;
+    private readonly EventBus             _bus;
+
+    private readonly Dictionary<Bombsite, List<ZoneData>> _zones = new()
+    {
+        [Bombsite.A] = new List<ZoneData>(),
+        [Bombsite.B] = new List<ZoneData>(),
+    };
+
+    // Keyed by SteamID64 (ulong). PlayerPostThink is per-tick — avoid allocations here.
+    private readonly Dictionary<ulong, PlayerZoneState> _playerStates = new();
+
+    // Stored delegates for deterministic unregister.
+    private readonly Action<Bombsite>                  _onBombsiteAnnounced;
+    private readonly Action<IPlayerThinkForwardParams> _onPlayerThink;
+
+    // ── IClientListener ────────────────────────────────────────────────────
+    int IClientListener.ListenerVersion  => IClientListener.ApiVersion;
+    int IClientListener.ListenerPriority => 0;
+
+    public ZonesModule(
+        ILogger<ZonesModule> logger,
+        InterfaceBridge      bridge,
+        ConfigModule         config,
+        EventBus             bus)
+    {
+        _logger = logger;
+        _bridge = bridge;
+        _config = config;
+        _bus    = bus;
+
+        _onBombsiteAnnounced = OnBombsiteAnnounced;
+        _onPlayerThink       = OnPlayerThink;
+    }
+
+    // ── IModule lifecycle ──────────────────────────────────────────────────
+
+    public bool Init() => true;
+
+    public void OnPostInit()
+    {
+        _bridge.ClientManager.InstallClientListener(this);
+        _bridge.HookManager.PlayerPostThink.InstallForward(_onPlayerThink);
+    }
+
+    public void OnAllSharpModulesLoaded()
+    {
+        _bus.OnAnnounceBombsite += _onBombsiteAnnounced;
+        LoadZones();
+    }
+
+    public void Shutdown()
+    {
+        _bus.OnAnnounceBombsite -= _onBombsiteAnnounced;
+        _bridge.HookManager.PlayerPostThink.RemoveForward(_onPlayerThink);
+        _bridge.ClientManager.RemoveClientListener(this);
+    }
+
+    // ── zone loading ───────────────────────────────────────────────────────
+
+    private void LoadZones()
+    {
+        _zones[Bombsite.A].Clear();
+        _zones[Bombsite.B].Clear();
+
+        var mapName = _bridge.ModSharp.GetMapName();
+        if (mapName is null)
+        {
+            _logger.LogDebug("[Retakes] ZonesModule: map name not available yet, skipping zone load.");
+            return;
+        }
+
+        var path = Path.Combine(_bridge.DataPath, "zones", $"{mapName}.json");
+        if (!File.Exists(path))
+        {
+            _logger.LogInformation("[Retakes] ZonesModule: no zone file for map '{Map}' (expected: {Path})", mapName, path);
+            return;
+        }
+
+        try
+        {
+            var text = File.ReadAllText(path);
+            var json = JsonSerializer.Deserialize<JsonBombsiteZones>(text);
+            if (json is null) return;
+
+            foreach (var z in json.a) _zones[Bombsite.A].Add(BuildZone(z));
+            foreach (var z in json.b) _zones[Bombsite.B].Add(BuildZone(z));
+
+            _logger.LogInformation("[Retakes] ZonesModule: loaded {A} A-site and {B} B-site zones for '{Map}'",
+                _zones[Bombsite.A].Count, _zones[Bombsite.B].Count, mapName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Retakes] ZonesModule: failed to load zones for '{Map}'", mapName);
+        }
+    }
+
+    private static ZoneData BuildZone(JsonZone z)
+        => new()
+        {
+            Type  = (ZoneType)z.type,
+            Teams = z.teams,
+            MinX  = Math.Min(z.x[0], z.y[0]),
+            MinY  = Math.Min(z.x[1], z.y[1]),
+            MinZ  = Math.Min(z.x[2], z.y[2]),
+            MaxX  = Math.Max(z.x[0], z.y[0]),
+            MaxY  = Math.Max(z.x[1], z.y[1]),
+            MaxZ  = Math.Max(z.x[2], z.y[2]),
+        };
+
+    // ── bombsite announcement handler ─────────────────────────────────────
+
+    private void OnBombsiteAnnounced(Bombsite site)
+    {
+        foreach (var controller in _bridge.EntityManager.FindPlayerControllers(true))
+        {
+            if (controller is null || !controller.IsValid()) continue;
+            if (controller.IsFakeClient)                     continue;
+
+            var pawn = controller.GetPlayerPawn();
+            if (pawn is null || !pawn.IsAlive)               continue;
+
+            var client = controller.GetGameClient();
+            if (client is not { IsInGame: true })            continue;
+
+            var steamId = (ulong)client.SteamId;
+            if (!_playerStates.TryGetValue(steamId, out var state))
+            {
+                state = new PlayerZoneState();
+                _playerStates[steamId] = state;
+            }
+
+            var team = (int)controller.Team;
+            state.Zones      = _zones[site].Where(z => z.Teams.Contains(team)).ToList();
+            state.GreenZones = [];
+        }
+    }
+
+    // ── PlayerPostThink forward ───────────────────────────────────────────
+
+    private void OnPlayerThink(IPlayerThinkForwardParams p)
+    {
+        var pawn = p.Pawn;
+        if (!pawn.IsValid()) return;
+
+        var client = p.Client;
+        if (client.IsFakeClient) return;
+
+        var steamId = (ulong)client.SteamId;
+        if (!_playerStates.TryGetValue(steamId, out var state)) return;
+        if (state.Zones.Count == 0)                              return;
+
+        var pos     = pawn.GetAbsOrigin();
+        var bounced = false;
+
+        foreach (var zone in state.Zones)
+        {
+            var inZone = zone.IsInZone(pos.X, pos.Y, pos.Z);
+
+            if (zone.Type == ZoneType.Red && inZone)
+            {
+                bounced = true;
+                break;
+            }
+
+            if (zone.Type == ZoneType.Green)
+            {
+                if (inZone && !state.GreenZones.Contains(zone))
+                {
+                    state.GreenZones.Add(zone);
+                }
+                else if (!inZone && state.GreenZones.Remove(zone) && state.GreenZones.Count == 0)
+                {
+                    bounced = true;
+                    break;
+                }
+            }
+        }
+
+        if (bounced)
+            DoBounce(pawn);
+    }
+
+    private static void DoBounce(Sharp.Shared.GameEntities.IPlayerPawn pawn)
+    {
+        var vel   = pawn.GetAbsVelocity();
+        var speed = Math.Sqrt((double)vel.X * vel.X + (double)vel.Y * vel.Y);
+        if (speed < 1.0) return;
+
+        var scale  = (float)(-350.0 / speed);
+        var newVel = new Vector(
+            vel.X * scale,
+            vel.Y * scale,
+            vel.Z <= 0f ? 150f : Math.Min(vel.Z, 150f));
+
+        pawn.Teleport(null, null, newVel);
+    }
+
+    // ── IClientListener impl ──────────────────────────────────────────────
+
+    void IClientListener.OnClientDisconnected(IGameClient client, Sharp.Shared.Enums.NetworkDisconnectionReason reason)
+    {
+        if (client.IsFakeClient) return;
+        _playerStates.Remove((ulong)client.SteamId);
+    }
+
+    void IClientListener.OnClientConnected(IGameClient client)   { }
+    void IClientListener.OnClientPutInServer(IGameClient client) { }
+}
