@@ -1,5 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Retakes.Config;
 using Retakes.Modules;
+using Retakes.Player;
+using Retakes.Queue;
+using Retakes.Spawn;
 
 namespace Retakes.Plugins;
 
@@ -8,9 +12,21 @@ internal static class ModuleDependencyInjection
     /// <summary>Register all Core services and modules into the DI container.</summary>
     internal static IServiceCollection AddModules(this IServiceCollection services)
     {
-        // Phase A: single bootstrap module. Add real modules here in Phase B.
+        // BootstrapModule kept as proof-of-life log
         services.AddSingleton<BootstrapModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BootstrapModule>());
+
+        services.AddSingleton<ConfigModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<ConfigModule>());
+
+        services.AddSingleton<SpawnModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<SpawnModule>());
+
+        services.AddSingleton<QueueModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<QueueModule>());
+
+        services.AddSingleton<PlayerLifecycleModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<PlayerLifecycleModule>());
 
         return services;
     }
