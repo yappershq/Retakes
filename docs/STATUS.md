@@ -7,8 +7,8 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
 ## Phase status
 - [x] **A. Scaffold** — Core/Shared/Database skeleton, IModule+DI, EventBus/IRetakesService. GREEN. commit 9c8d0d4.
 - [x] **B1. State foundation** — config, spawn data, player lifecycle, queue/team. GREEN. (commit below)
-- [~] **B2. Round flow** — RoundFlowModule orchestration + fallback alloc + fire OnAnnounceBombsite/OnAllocate.
-- [ ] **C. Combat round** — BombModule (autoplant), BreakerModule, AnnouncementModule, DefuseModule, ZonesModule.
+- [x] **B2. Round flow** — RoundFlowModule + fallback alloc + assister scoring. GREEN. Core spine done.
+- [~] **C. Combat round** — BombModule (autoplant), BreakerModule, AnnouncementModule, DefuseModule, ZonesModule.
 - [ ] **D. Allocator** — round types, weapon/nade/armor alloc, prefs DB, menus, votes, CanAcquire.
 - [ ] **E. Spawn editor.**
 - [ ] **F. Review** — anti-pattern pass, README, configs.example, lang, gamedata; create+push public GitHub repo.
@@ -18,6 +18,12 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
 - EventBus published via SharpModuleManager.RegisterSharpModuleInterface<IRetakesService>(this, Identity, _bus) in PostInit.
 - SqlSugar: SqlSugarCoreNoDrive 5.1.4.211, MySqlConnector 2.5.0.
 - HIGH-RISK open items: bomb auto-plant (planted_c4 + fire bomb_planted), allocator CanAcquire buy-blocking. Pick cleanest ModSharp path or v1 fallback + note.
+
+## Phase C notes (from B2)
+- round events via GLOBAL IEventListener.FireGameEvent (filter by name); typed: IEventRoundEnd(Winner CStrikeTeam), IEventBombPlanted(Controller,Site short), IEventBombDefused, IEventPlayerDeath(AssisterController).
+- NO `round_freeze_end` event in ModSharp — use IGameListener.OnRoundRestarted() or cs_round_start_beep for auto-plant timing.
+- RoundFlowModule.PlanterSteamId + TerminateRound(RoundEndReason) exposed for BombModule. OnBombPlanted has TODO.
+- IGameRules.TerminateRound(float,RoundEndReason,bool,TeamRewardInfo[]?) via ModSharp.GetGameRules().
 
 ## Resume instructions (post-compaction)
 1. Read this file + docs/PORT_PLAN.md.

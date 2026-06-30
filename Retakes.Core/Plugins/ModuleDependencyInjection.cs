@@ -3,6 +3,7 @@ using Retakes.Config;
 using Retakes.Modules;
 using Retakes.Player;
 using Retakes.Queue;
+using Retakes.RoundFlow;
 using Retakes.Spawn;
 
 namespace Retakes.Plugins;
@@ -27,6 +28,14 @@ internal static class ModuleDependencyInjection
 
         services.AddSingleton<PlayerLifecycleModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<PlayerLifecycleModule>());
+
+        // B2: round flow orchestration
+        services.AddSingleton<RoundFlowModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<RoundFlowModule>());
+
+        // B2: fallback weapon allocator (subscribes to OnAllocate in OAM)
+        services.AddSingleton<FallbackAllocationModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<FallbackAllocationModule>());
 
         return services;
     }
