@@ -3,6 +3,7 @@ using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
+using Retakes.Utils;
 using Sharp.Shared.Enums;
 using Sharp.Shared.Objects;
 using Sharp.Shared.Units;
@@ -192,6 +193,61 @@ internal sealed class AllocatorModule : IModule
         }
 
         _logger.LogInformation("[Retakes] Allocated {Count} player(s), round={RoundType}.", count, roundType);
+
+        // ── 6. Round-type .cfg exec (execifexists per round type, mirrors source) ──
+        ExecRoundTypeCfg(roundType);
+
+        // ── 7. Round-type announcement to ALL players (chat + optional center) ────
+        AnnounceRoundType(roundType, allocCfg);
+    }
+
+    // ── Round-type .cfg exec ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs <c>execifexists cs2-retakes/{Pistol|SmallBuy|FullBuy}.cfg</c> for the chosen round type,
+    /// matching RetakesAllocator.HandleAllocateEvent. Servers can drop these cfgs to tune per-tier
+    /// convars (e.g. buy time, money) without a plugin rebuild; execifexists no-ops if absent.
+    /// </summary>
+    private void ExecRoundTypeCfg(RoundType roundType)
+    {
+        var cfg = roundType switch
+        {
+            RoundType.Pistol  => "cs2-retakes/Pistol.cfg",
+            RoundType.HalfBuy => "cs2-retakes/SmallBuy.cfg",
+            RoundType.FullBuy => "cs2-retakes/FullBuy.cfg",
+            _                 => null,
+        };
+        if (cfg is not null)
+            _bridge.ModSharp.ServerCommand($"execifexists {cfg}");
+    }
+
+    // ── Round-type announcement ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Broadcasts the chosen round type to ALL players (chat, each in their own locale), and — when
+    /// <c>EnableRoundTypeAnnouncementCenter</c> is set — a plain center line to every player too.
+    /// Mirrors RetakesAllocator.HandleAllocateEvent (announcement to all, not just the voter).
+    /// </summary>
+    private void AnnounceRoundType(RoundType roundType, AllocatorSettings cfg)
+    {
+        if (!cfg.EnableRoundTypeAnnouncement) return;
+
+        var nameKey = roundType switch
+        {
+            RoundType.Pistol  => "Retakes_RoundType_Pistol",
+            RoundType.HalfBuy => "Retakes_RoundType_HalfBuy",
+            _                 => "Retakes_RoundType_FullBuy",
+        };
+        var lm = _bridge.LocalizerManager;
+
+        foreach (var client in _bridge.ClientManager.GetGameClients(inGame: true))
+        {
+            if (client.IsFakeClient) continue;
+            var typeName = Loc.Str(lm, client, nameKey);
+            Loc.Chat(lm, client, "Retakes_RoundType_Announce", typeName);
+            if (cfg.EnableRoundTypeAnnouncementCenter)
+                Loc.Center(lm, client, "Retakes_RoundType_AnnounceCenter", typeName);
+        }
     }
 
     // ── Loadout ────────────────────────────────────────────────────────────

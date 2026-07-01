@@ -169,13 +169,87 @@ public class AllocatorSettings
 
     // ── D2 features ───────────────────────────────────────────────────────
 
+    // Source default = false (Configs.cs:246). Voting off unless an operator opts in.
     [JsonPropertyName("enable_next_round_type_voting")]
-    public bool EnableNextRoundTypeVoting { get; set; } = true;
+    public bool EnableNextRoundTypeVoting { get; set; } = false;
 
+    // Source default = true (Configs.cs:234). Allows the allocator to (re-)give weapons after
+    // freeze time ends, i.e. mid-round !guns re-allocation; gates BuyControlModule's post-freeze give.
     [JsonPropertyName("allow_allocation_after_freeze_time")]
-    public bool AllowAllocationAfterFreezeTime { get; set; } = false;
+    public bool AllowAllocationAfterFreezeTime { get; set; } = true;
+
+    // ── Round-type announcement (Configs.cs:237-238) ──────────────────────
+
+    [JsonPropertyName("enable_round_type_announcement")]
+    public bool EnableRoundTypeAnnouncement { get; set; } = true;
+
+    [JsonPropertyName("enable_round_type_announcement_center")]
+    public bool EnableRoundTypeAnnouncementCenter { get; set; } = false;
+
+    // ── Bombsite center/chat announcement (Configs.cs:236, 239-245) ────────
+
+    // Master toggle for the rich center-HTML bombsite announce (site image + live team counts).
+    [JsonPropertyName("enable_bomb_site_announcement_center")]
+    public bool EnableBombSiteAnnouncementCenter { get; set; } = false;
+
+    // When center-announce is on, show it only to CTs (retakers) — Ts get nothing.
+    [JsonPropertyName("bomb_site_announcement_center_to_ct_only")]
+    public bool BombSiteAnnouncementCenterToCtOnly { get; set; } = false;
+
+    // Suppress the engine's default "Bomb has been planted at site X" center message.
+    [JsonPropertyName("disable_default_bomb_planted_center_message")]
+    public bool DisableDefaultBombPlantedCenterMessage { get; set; } = false;
+
+    // When the bomb is planted, immediately stop the center-HTML announce refresh loop.
+    [JsonPropertyName("force_close_bomb_site_announcement_center_on_plant")]
+    public bool ForceCloseBombSiteAnnouncementCenterOnPlant { get; set; } = true;
+
+    // Delay (seconds) after the planter spawns before the center-HTML announce starts.
+    [JsonPropertyName("bomb_site_announcement_center_delay")]
+    public float BombSiteAnnouncementCenterDelay { get; set; } = 1.0f;
+
+    // How long (seconds) the center-HTML announce stays on screen (refreshed each tick to keep counts live).
+    [JsonPropertyName("bomb_site_announcement_center_show_timer")]
+    public float BombSiteAnnouncementCenterShowTimer { get; set; } = 5.0f;
+
+    // ASCII-art bombsite lines printed to chat (source default off).
+    [JsonPropertyName("enable_bomb_site_announcement_chat")]
+    public bool EnableBombSiteAnnouncementChat { get; set; } = false;
+
+    // ── CanAcquire buy-block hook (Configs.cs:264) ────────────────────────
+
+    // Master switch for the mid-round CanAcquire buy-blocking hook. Opt-out-able per source.
+    [JsonPropertyName("enable_can_acquire_hook")]
+    public bool EnableCanAcquireHook { get; set; } = true;
+
+    // ── Skin support (Configs.cs:236) ─────────────────────────────────────
+
+    // Source gives allocated weapons via a paint-capable path (WeaponPaints/skins plugin capability).
+    // ModSharp has no equivalent capability API; this flag is a documented no-op — allocated weapons
+    // are given via GiveNamedItem, which a skins plugin can still decorate on its own item hooks.
+    [JsonPropertyName("capability_weapon_paints")]
+    public bool CapabilityWeaponPaints { get; set; } = true;
+
+    // ── Menu triggers (Configs.cs:270-273) ────────────────────────────────
+
+    // Comma-separated chat/console triggers that open the WASD/center gun menu.
+    [JsonPropertyName("in_game_gun_menu_center_commands")]
+    public string InGameGunMenuCenterCommands { get; set; } =
+        "gunsmenu,gunmenu,gunsmenu,menugun,menuguns";
+
+    // Comma-separated chat triggers that open the chat-based !guns menu.
+    [JsonPropertyName("in_game_gun_menu_chat_commands")]
+    public string InGameGunMenuChatCommands { get; set; } = "guns";
 
     // ── Helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>Parse a comma-separated command trigger string into bare command names (css_/!/ stripped).</summary>
+    public static IEnumerable<string> ParseMenuTriggers(string commands)
+        => commands.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                   .Select(c => c.TrimStart('!', '/'))
+                   .Where(c => c.Length > 0)
+                   .Distinct(StringComparer.OrdinalIgnoreCase);
+
 
     public double GetRoundTypePercentage(RoundType roundType)
         => Math.Round(RoundTypePercentages.GetValueOrDefault(roundType, 0) / 100.0, 2);

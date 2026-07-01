@@ -17,10 +17,11 @@ public class GameSettings
     [JsonPropertyName("should_break_breakables")]    public bool ShouldBreakBreakables    { get; set; } = false;
     [JsonPropertyName("should_open_doors")]          public bool ShouldOpenDoors          { get; set; } = false;
     /// <summary>
-    /// Fallback allocator active only when Allocator.Enabled is false.
-    /// Kept for backwards-compat; overridden by Allocator.Enabled check at runtime.
+    /// Fallback allocator (b3none base) — active only when Allocator.Enabled is false. Source default
+    /// is true; our real allocator supersedes it whenever Allocator.Enabled (the normal case), so this
+    /// only takes effect on servers that explicitly disable the allocator. Kept true to match source.
     /// </summary>
-    [JsonPropertyName("enable_fallback_allocation")] public bool EnableFallbackAllocation { get; set; } = false;
+    [JsonPropertyName("enable_fallback_allocation")] public bool EnableFallbackAllocation { get; set; } = true;
 }
 
 public class QueueSettings
@@ -46,7 +47,9 @@ public class TeamSettings
 public class MapConfigSettings
 {
     [JsonPropertyName("enable_bombsite_announcement_center")] public bool EnableBombsiteAnnouncementCenter { get; set; } = true;
-    [JsonPropertyName("enable_bombsite_announcement_voices")] public bool EnableBombsiteAnnouncementVoices { get; set; } = true;
+
+    // Source default = false (Configs.cs EnableBombsiteAnnouncementVoices path) — voice cues off unless opted in.
+    [JsonPropertyName("enable_bombsite_announcement_voices")] public bool EnableBombsiteAnnouncementVoices { get; set; } = false;
 }
 
 public class BombSettings

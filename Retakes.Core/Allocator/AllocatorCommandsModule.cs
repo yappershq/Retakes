@@ -83,13 +83,26 @@ internal sealed class AllocatorCommandsModule : IModule
         }
         else
         {
-            var reg = cc.GetRegistry("retakes");
-            reg.RegisterClientCommand("guns",      OnGunsCommand);
+            var reg      = cc.GetRegistry("retakes");
+            var allocCfg = _config.Config.Allocator;
+
+            // Configurable menu triggers (source InGameGunMenu{Chat,Center}Commands). Both open the
+            // same cached gun menu; bare command names (css_/!/ stripped) per house convention.
+            // Always register "guns" as the canonical fallback so the menu is never unreachable.
+            var registered = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "guns" };
+            reg.RegisterClientCommand("guns", OnGunsCommand);
+            foreach (var trigger in AllocatorSettings.ParseMenuTriggers(allocCfg.InGameGunMenuChatCommands)
+                         .Concat(AllocatorSettings.ParseMenuTriggers(allocCfg.InGameGunMenuCenterCommands)))
+            {
+                if (registered.Add(trigger))
+                    reg.RegisterClientCommand(trigger, OnGunsCommand);
+            }
+
             reg.RegisterClientCommand("gun",       OnGunCommand);
             reg.RegisterClientCommand("awp",       OnAwpCommand);
             reg.RegisterClientCommand("removegun", OnRemoveGunCommand);
 
-            if (_config.Config.Allocator.EnableNextRoundTypeVoting)
+            if (allocCfg.EnableNextRoundTypeVoting)
                 reg.RegisterClientCommand("nextround", OnNextRoundCommand);
         }
 

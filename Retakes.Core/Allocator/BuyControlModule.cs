@@ -75,19 +75,35 @@ internal sealed class BuyControlModule : IModule, IEventListener
 
     public bool Init() => true;
 
+    // Tracks whether we installed the CanAcquire pre-hook (config opt-out) so Shutdown is symmetric.
+    private bool _canAcquireHookInstalled;
+
     public void OnPostInit()
     {
-        _bridge.HookManager.PlayerCanAcquire.InstallHookPre(_canAcquirePre);
+        // EnableCanAcquireHook (source default true) — the mid-round buy-block hook is opt-out-able.
+        if (_config.Config.Allocator.EnableCanAcquireHook)
+        {
+            _bridge.HookManager.PlayerCanAcquire.InstallHookPre(_canAcquirePre);
+            _canAcquireHookInstalled = true;
+        }
+        else
+        {
+            _logger.LogInformation("[Retakes] BuyControlModule: CanAcquire hook disabled by config; mid-round buys unrestricted (item_purchase fallback still active).");
+        }
+
+        // item_purchase listener always runs — it saves prefs and strips invalid buys (fallback layer).
         _bridge.EventManager.HookEvent("item_purchase");
         _bridge.EventManager.InstallEventListener(this);
-        _logger.LogInformation("[Retakes] BuyControlModule: PlayerCanAcquire hook + item_purchase listener installed.");
+        _logger.LogInformation("[Retakes] BuyControlModule: item_purchase listener installed (CanAcquire hook={Hook}).",
+            _canAcquireHookInstalled);
     }
 
     public void OnAllSharpModulesLoaded() { }
 
     public void Shutdown()
     {
-        _bridge.HookManager.PlayerCanAcquire.RemoveHookPre(_canAcquirePre);
+        if (_canAcquireHookInstalled)
+            _bridge.HookManager.PlayerCanAcquire.RemoveHookPre(_canAcquirePre);
         _bridge.EventManager.RemoveEventListener(this);
     }
 

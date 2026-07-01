@@ -1,88 +1,293 @@
 {
-  "Retakes_NoPermission":            { "en-US": "{{green}}[Retakes]{{default}} You do not have permission to use this command." },
-
-  "Retakes_Bombsite_Announce":       { "en-US": "{{green}}[Retakes]{{default}} {{green}}Bombsite {0}!" },
-  "Retakes_Bombsite_Center":         { "en-US": "Bombsite {0}" },
-  "Retakes_Voices_Enabled":          { "en-US": "{{green}}[Retakes]{{default}} Voices [{{green}}enabled{{default}}]" },
-  "Retakes_Voices_Disabled":         { "en-US": "{{green}}[Retakes]{{default}} Voices [{{red}}disabled{{default}}]" },
-
-  "Retakes_Spawn_UsageShow":         { "en-US": "{{green}}[Retakes]{{default}} Usage: !showspawns [A/B]" },
-  "Retakes_Spawn_SpecifyBombsite":   { "en-US": "{{green}}[Retakes]{{default}} You must specify a bombsite [A / B]." },
-  "Retakes_Spawn_Editing":           { "en-US": "{{green}}[Retakes]{{default}} Editing spawns for bombsite {0}. Use !add / !remove / !nearest, !done to finish." },
-  "Retakes_Spawn_EnterEditFirst":    { "en-US": "{{green}}[Retakes]{{default}} Enter edit mode first with !showspawns [A/B]." },
-  "Retakes_Spawn_NeedAlivePawn":     { "en-US": "{{green}}[Retakes]{{default}} You must have an alive player pawn." },
-  "Retakes_Spawn_UsageAdd":          { "en-US": "{{green}}[Retakes]{{default}} Usage: !add [T/CT] [Y/N can-be-planter]" },
-  "Retakes_Spawn_SpecifyTeam":       { "en-US": "{{green}}[Retakes]{{default}} You must specify a team [T / CT]." },
-  "Retakes_Spawn_BadPlanter":        { "en-US": "{{green}}[Retakes]{{default}} Incorrect can-be-planter value [Y / N]." },
-  "Retakes_Spawn_TooClose":          { "en-US": "{{green}}[Retakes]{{default}} You are too close to another spawn (min 72u)." },
-  "Retakes_Spawn_Added":             { "en-US": "{{green}}[Retakes]{{default}} Spawn added ({0})." },
-  "Retakes_Spawn_AddedPlanter":      { "en-US": "{{green}}[Retakes]{{default}} Spawn added ({0} planter)." },
-  "Retakes_Spawn_AddError":          { "en-US": "{{green}}[Retakes]{{default}} Error adding spawn (duplicate position?)." },
-  "Retakes_Spawn_NoneWithin128":     { "en-US": "{{green}}[Retakes]{{default}} No spawn found within 128u." },
-  "Retakes_Spawn_Removed":           { "en-US": "{{green}}[Retakes]{{default}} Spawn removed." },
-  "Retakes_Spawn_RemoveError":       { "en-US": "{{green}}[Retakes]{{default}} Error removing spawn." },
-  "Retakes_Spawn_NoneFound":         { "en-US": "{{green}}[Retakes]{{default}} No spawns found." },
-  "Retakes_Spawn_Teleported":        { "en-US": "{{green}}[Retakes]{{default}} Teleported to nearest spawn." },
-  "Retakes_Spawn_Exited":            { "en-US": "{{green}}[Retakes]{{default}} Exited spawn edit mode." },
-  "Retakes_Spawn_UsageMapconfig":    { "en-US": "{{green}}[Retakes]{{default}} Usage: !mapconfig [filename]" },
-  "Retakes_Spawn_MapconfigNotFound": { "en-US": "{{green}}[Retakes]{{default}} Map config '{0}' not found." },
-  "Retakes_Spawn_MapconfigLoaded":   { "en-US": "{{green}}[Retakes]{{default}} Loaded map config '{0}'." },
-  "Retakes_Spawn_NoMapConfigs":      { "en-US": "{{green}}[Retakes]{{default}} No map configs found." },
-  "Retakes_Spawn_MapconfigItem":     { "en-US": "{{green}}[Retakes]{{default}} !mapconfig {0}" },
-  "Retakes_Spawn_MapconfigsListed":  { "en-US": "{{green}}[Retakes]{{default}} Available map configs listed above." },
-  "Retakes_Spawn_UsageForce":        { "en-US": "{{green}}[Retakes]{{default}} Usage: !forcebombsite [A/B]" },
-  "Retakes_Spawn_BombsiteForced":    { "en-US": "{{green}}[Retakes]{{default}} Bombsite forced to {0}." },
-  "Retakes_Spawn_BombsiteUnforced":  { "en-US": "{{green}}[Retakes]{{default}} Bombsite is no longer forced." },
-  "Retakes_Spawn_QueuesDumped":      { "en-US": "{{green}}[Retakes]{{default}} Queues dumped to server console. Active={0} Queue={1}." },
-  "Retakes_Spawn_Showing":           { "en-US": "{{green}}[Retakes]{{default}} Showing {0} spawns for bombsite {1}." },
-  "Retakes_Spawn_Label":             { "en-US": "{0}{1}\nBombsite {2}\n{3} {4} {5}" },
-  "Retakes_Spawn_LabelPlanter":      { "en-US": " [PLANTER]" },
-
-  "Retakes_Alloc_MenuUnavailable":     { "en-US": "{{green}}[Retakes]{{default}} Gun menu not available (MenuManager module missing)." },
-  "Retakes_Alloc_SelectionDisabled":   { "en-US": "{{green}}[Retakes]{{default}} Weapon selection is disabled." },
-  "Retakes_Alloc_UsageGun":            { "en-US": "{{green}}[Retakes]{{default}} Usage: !gun <weapon> [T|CT]" },
-  "Retakes_Alloc_InvalidTeam":         { "en-US": "{{green}}[Retakes]{{default}} Invalid team '{0}'. Use T or CT." },
-  "Retakes_Alloc_JoinTeamFirst":       { "en-US": "{{green}}[Retakes]{{default}} Join a team first or specify T/CT." },
-  "Retakes_Alloc_UnknownWeapon":       { "en-US": "{{green}}[Retakes]{{default}} Unknown weapon '{0}'." },
-  "Retakes_Alloc_NotSelectable":       { "en-US": "{{green}}[Retakes]{{default}} '{0}' is not a selectable weapon." },
-  "Retakes_Alloc_NotAllowed":          { "en-US": "{{green}}[Retakes]{{default}} '{0}' is not allowed on this server." },
-  "Retakes_Alloc_NotValidForTeam":     { "en-US": "{{green}}[Retakes]{{default}} '{0}' is not valid for team {1}." },
-  "Retakes_Alloc_PrefRemoved":         { "en-US": "{{green}}[Retakes]{{default}} Removed {0} preference for {1} ({2})." },
-  "Retakes_Alloc_PrefSet":             { "en-US": "{{green}}[Retakes]{{default}} Set {0} as your {1} preference for {2}." },
-  "Retakes_Alloc_AwpRemoved":          { "en-US": "{{green}}[Retakes]{{default}} AWP preference removed — you will not be given a preferred sniper." },
-  "Retakes_Alloc_AwpSet":              { "en-US": "{{green}}[Retakes]{{default}} AWP preference set — you will be considered for a preferred sniper." },
-  "Retakes_Alloc_VoteMenuUnavailable": { "en-US": "{{green}}[Retakes]{{default}} Vote menu not available." },
-  "Retakes_Alloc_PrefsSaved":          { "en-US": "{{green}}[Retakes]{{default}} Preferences saved!" },
-  "Retakes_Alloc_VoteCast":            { "en-US": "{{green}}[Retakes]{{default}} Vote cast: {0}." },
-
-  "Retakes_RoundType_Pistol":   { "en-US": "Pistol" },
-  "Retakes_RoundType_HalfBuy":  { "en-US": "Half-Buy" },
-  "Retakes_RoundType_FullBuy":  { "en-US": "Full-Buy" },
-
-  "Retakes_Menu_WeaponPrefs":        { "en-US": "Weapon Preferences" },
-  "Retakes_Menu_SniperPref":         { "en-US": "Sniper Preference" },
-  "Retakes_Menu_RequestAwp":         { "en-US": "Request AWP / Sniper (queue-based)" },
-  "Retakes_Menu_NoPreferredSniper":  { "en-US": "No preferred sniper" },
-  "Retakes_Menu_SkipDone":           { "en-US": "Skip / Done" },
-  "Retakes_Menu_Skip":               { "en-US": "Skip" },
-  "Retakes_Menu_VoteTitle":          { "en-US": "Vote: Next Round Type" },
-  "Retakes_Menu_Cancel":             { "en-US": "Cancel" },
-  "Retakes_Menu_Page_CtHalf":        { "en-US": "CT HalfBuy Primary" },
-  "Retakes_Menu_Page_THalf":         { "en-US": "T HalfBuy Primary" },
-  "Retakes_Menu_Page_CtPistol":      { "en-US": "CT Pistol Round" },
-  "Retakes_Menu_Page_TPistol":       { "en-US": "T Pistol Round" },
-  "Retakes_Menu_Page_CtSecondary":   { "en-US": "CT Secondary (Full/Half-buy)" },
-  "Retakes_Menu_Page_TSecondary":    { "en-US": "T Secondary (Full/Half-buy)" },
-  "Retakes_Menu_Page_CtPrimary":     { "en-US": "CT Primary (Full-buy)" },
-  "Retakes_Menu_Page_TPrimary":      { "en-US": "T Primary (Full-buy)" },
-
-  "Retakes_Vote_Started":  { "en-US": "{{green}}[Retakes]{{default}} Vote started! Type !nextround to vote for the next round type." },
-  "Retakes_Vote_NoVotes":  { "en-US": "{{green}}[Retakes]{{default}} Vote ended — no votes cast." },
-  "Retakes_Vote_Failed":   { "en-US": "{{green}}[Retakes]{{default}} Vote failed — not enough players voted." },
-  "Retakes_Vote_Complete": { "en-US": "{{green}}[Retakes]{{default}} Vote complete! Next round will be {0}." },
-
-  "Retakes_Teams_ScrambleNext":      { "en-US": "{{green}}[Retakes]{{default}} Teams will be scrambled next round." },
-  "Retakes_Teams_ScrambleNextAdmin": { "en-US": "{{green}}[Retakes]{{default}} Teams will be scrambled next round (by admin)." },
-  "Retakes_Teams_CtSwapped":         { "en-US": "{{green}}[Retakes]{{default}} CTs win again — teams swapped ({0}/{1})." },
-  "Retakes_Teams_Scrambled":         { "en-US": "{{green}}[Retakes]{{default}} Teams have been scrambled." }
+  "Retakes_NoPermission": {
+    "en-US": "{{green}}[Retakes]{{default}} You do not have permission to use this command."
+  },
+  "Retakes_Bombsite_Announce": {
+    "en-US": "{{green}}[Retakes]{{default}} {{green}}Bombsite {0}!"
+  },
+  "Retakes_Bombsite_Center": {
+    "en-US": "Bombsite {0}"
+  },
+  "Retakes_Voices_Enabled": {
+    "en-US": "{{green}}[Retakes]{{default}} Voices [{{green}}enabled{{default}}]"
+  },
+  "Retakes_Voices_Disabled": {
+    "en-US": "{{green}}[Retakes]{{default}} Voices [{{red}}disabled{{default}}]"
+  },
+  "Retakes_Spawn_UsageShow": {
+    "en-US": "{{green}}[Retakes]{{default}} Usage: !showspawns [A/B]"
+  },
+  "Retakes_Spawn_SpecifyBombsite": {
+    "en-US": "{{green}}[Retakes]{{default}} You must specify a bombsite [A / B]."
+  },
+  "Retakes_Spawn_Editing": {
+    "en-US": "{{green}}[Retakes]{{default}} Editing spawns for bombsite {0}. Use !add / !remove / !nearest, !done to finish."
+  },
+  "Retakes_Spawn_EnterEditFirst": {
+    "en-US": "{{green}}[Retakes]{{default}} Enter edit mode first with !showspawns [A/B]."
+  },
+  "Retakes_Spawn_NeedAlivePawn": {
+    "en-US": "{{green}}[Retakes]{{default}} You must have an alive player pawn."
+  },
+  "Retakes_Spawn_UsageAdd": {
+    "en-US": "{{green}}[Retakes]{{default}} Usage: !add [T/CT] [Y/N can-be-planter]"
+  },
+  "Retakes_Spawn_SpecifyTeam": {
+    "en-US": "{{green}}[Retakes]{{default}} You must specify a team [T / CT]."
+  },
+  "Retakes_Spawn_BadPlanter": {
+    "en-US": "{{green}}[Retakes]{{default}} Incorrect can-be-planter value [Y / N]."
+  },
+  "Retakes_Spawn_TooClose": {
+    "en-US": "{{green}}[Retakes]{{default}} You are too close to another spawn (min 72u)."
+  },
+  "Retakes_Spawn_Added": {
+    "en-US": "{{green}}[Retakes]{{default}} Spawn added ({0})."
+  },
+  "Retakes_Spawn_AddedPlanter": {
+    "en-US": "{{green}}[Retakes]{{default}} Spawn added ({0} planter)."
+  },
+  "Retakes_Spawn_AddError": {
+    "en-US": "{{green}}[Retakes]{{default}} Error adding spawn (duplicate position?)."
+  },
+  "Retakes_Spawn_NoneWithin128": {
+    "en-US": "{{green}}[Retakes]{{default}} No spawn found within 128u."
+  },
+  "Retakes_Spawn_Removed": {
+    "en-US": "{{green}}[Retakes]{{default}} Spawn removed."
+  },
+  "Retakes_Spawn_RemoveError": {
+    "en-US": "{{green}}[Retakes]{{default}} Error removing spawn."
+  },
+  "Retakes_Spawn_NoneFound": {
+    "en-US": "{{green}}[Retakes]{{default}} No spawns found."
+  },
+  "Retakes_Spawn_Teleported": {
+    "en-US": "{{green}}[Retakes]{{default}} Teleported to nearest spawn."
+  },
+  "Retakes_Spawn_Exited": {
+    "en-US": "{{green}}[Retakes]{{default}} Exited spawn edit mode."
+  },
+  "Retakes_Spawn_UsageMapconfig": {
+    "en-US": "{{green}}[Retakes]{{default}} Usage: !mapconfig [filename]"
+  },
+  "Retakes_Spawn_MapconfigNotFound": {
+    "en-US": "{{green}}[Retakes]{{default}} Map config '{0}' not found."
+  },
+  "Retakes_Spawn_MapconfigLoaded": {
+    "en-US": "{{green}}[Retakes]{{default}} Loaded map config '{0}'."
+  },
+  "Retakes_Spawn_NoMapConfigs": {
+    "en-US": "{{green}}[Retakes]{{default}} No map configs found."
+  },
+  "Retakes_Spawn_MapconfigItem": {
+    "en-US": "{{green}}[Retakes]{{default}} !mapconfig {0}"
+  },
+  "Retakes_Spawn_MapconfigsListed": {
+    "en-US": "{{green}}[Retakes]{{default}} Available map configs listed above."
+  },
+  "Retakes_Spawn_UsageForce": {
+    "en-US": "{{green}}[Retakes]{{default}} Usage: !forcebombsite [A/B]"
+  },
+  "Retakes_Spawn_BombsiteForced": {
+    "en-US": "{{green}}[Retakes]{{default}} Bombsite forced to {0}."
+  },
+  "Retakes_Spawn_BombsiteUnforced": {
+    "en-US": "{{green}}[Retakes]{{default}} Bombsite is no longer forced."
+  },
+  "Retakes_Spawn_QueuesDumped": {
+    "en-US": "{{green}}[Retakes]{{default}} Queues dumped to server console. Active={0} Queue={1}."
+  },
+  "Retakes_Spawn_Showing": {
+    "en-US": "{{green}}[Retakes]{{default}} Showing {0} spawns for bombsite {1}."
+  },
+  "Retakes_Spawn_Label": {
+    "en-US": "{0}{1}\nBombsite {2}\n{3} {4} {5}"
+  },
+  "Retakes_Spawn_LabelPlanter": {
+    "en-US": " [PLANTER]"
+  },
+  "Retakes_Alloc_MenuUnavailable": {
+    "en-US": "{{green}}[Retakes]{{default}} Gun menu not available (MenuManager module missing)."
+  },
+  "Retakes_Alloc_SelectionDisabled": {
+    "en-US": "{{green}}[Retakes]{{default}} Weapon selection is disabled."
+  },
+  "Retakes_Alloc_UsageGun": {
+    "en-US": "{{green}}[Retakes]{{default}} Usage: !gun <weapon> [T|CT]"
+  },
+  "Retakes_Alloc_InvalidTeam": {
+    "en-US": "{{green}}[Retakes]{{default}} Invalid team '{0}'. Use T or CT."
+  },
+  "Retakes_Alloc_JoinTeamFirst": {
+    "en-US": "{{green}}[Retakes]{{default}} Join a team first or specify T/CT."
+  },
+  "Retakes_Alloc_UnknownWeapon": {
+    "en-US": "{{green}}[Retakes]{{default}} Unknown weapon '{0}'."
+  },
+  "Retakes_Alloc_NotSelectable": {
+    "en-US": "{{green}}[Retakes]{{default}} '{0}' is not a selectable weapon."
+  },
+  "Retakes_Alloc_NotAllowed": {
+    "en-US": "{{green}}[Retakes]{{default}} '{0}' is not allowed on this server."
+  },
+  "Retakes_Alloc_NotValidForTeam": {
+    "en-US": "{{green}}[Retakes]{{default}} '{0}' is not valid for team {1}."
+  },
+  "Retakes_Alloc_PrefRemoved": {
+    "en-US": "{{green}}[Retakes]{{default}} Removed {0} preference for {1} ({2})."
+  },
+  "Retakes_Alloc_PrefSet": {
+    "en-US": "{{green}}[Retakes]{{default}} Set {0} as your {1} preference for {2}."
+  },
+  "Retakes_Alloc_AwpRemoved": {
+    "en-US": "{{green}}[Retakes]{{default}} AWP preference removed — you will not be given a preferred sniper."
+  },
+  "Retakes_Alloc_AwpSet": {
+    "en-US": "{{green}}[Retakes]{{default}} AWP preference set — you will be considered for a preferred sniper."
+  },
+  "Retakes_Alloc_VoteMenuUnavailable": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote menu not available."
+  },
+  "Retakes_Alloc_PrefsSaved": {
+    "en-US": "{{green}}[Retakes]{{default}} Preferences saved!"
+  },
+  "Retakes_Alloc_VoteCast": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote cast: {0}."
+  },
+  "Retakes_RoundType_Pistol": {
+    "en-US": "Pistol"
+  },
+  "Retakes_RoundType_HalfBuy": {
+    "en-US": "Half-Buy"
+  },
+  "Retakes_RoundType_FullBuy": {
+    "en-US": "Full-Buy"
+  },
+  "Retakes_Menu_WeaponPrefs": {
+    "en-US": "Weapon Preferences"
+  },
+  "Retakes_Menu_SniperPref": {
+    "en-US": "Sniper Preference"
+  },
+  "Retakes_Menu_RequestAwp": {
+    "en-US": "Request AWP / Sniper (queue-based)"
+  },
+  "Retakes_Menu_NoPreferredSniper": {
+    "en-US": "No preferred sniper"
+  },
+  "Retakes_Menu_SkipDone": {
+    "en-US": "Skip / Done"
+  },
+  "Retakes_Menu_Skip": {
+    "en-US": "Skip"
+  },
+  "Retakes_Menu_VoteTitle": {
+    "en-US": "Vote: Next Round Type"
+  },
+  "Retakes_Menu_Cancel": {
+    "en-US": "Cancel"
+  },
+  "Retakes_Menu_Page_CtHalf": {
+    "en-US": "CT HalfBuy Primary"
+  },
+  "Retakes_Menu_Page_THalf": {
+    "en-US": "T HalfBuy Primary"
+  },
+  "Retakes_Menu_Page_CtPistol": {
+    "en-US": "CT Pistol Round"
+  },
+  "Retakes_Menu_Page_TPistol": {
+    "en-US": "T Pistol Round"
+  },
+  "Retakes_Menu_Page_CtSecondary": {
+    "en-US": "CT Secondary (Full/Half-buy)"
+  },
+  "Retakes_Menu_Page_TSecondary": {
+    "en-US": "T Secondary (Full/Half-buy)"
+  },
+  "Retakes_Menu_Page_CtPrimary": {
+    "en-US": "CT Primary (Full-buy)"
+  },
+  "Retakes_Menu_Page_TPrimary": {
+    "en-US": "T Primary (Full-buy)"
+  },
+  "Retakes_Vote_Started": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote started! Type !nextround to vote for the next round type."
+  },
+  "Retakes_Vote_NoVotes": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote ended — no votes cast."
+  },
+  "Retakes_Vote_Failed": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote failed — not enough players voted."
+  },
+  "Retakes_Vote_Complete": {
+    "en-US": "{{green}}[Retakes]{{default}} Vote complete! Next round will be {0}."
+  },
+  "Retakes_Teams_ScrambleNext": {
+    "en-US": "{{green}}[Retakes]{{default}} Teams will be scrambled next round."
+  },
+  "Retakes_Teams_ScrambleNextAdmin": {
+    "en-US": "{{green}}[Retakes]{{default}} Teams will be scrambled next round (by admin)."
+  },
+  "Retakes_Teams_CtSwapped": {
+    "en-US": "{{green}}[Retakes]{{default}} CTs win again — teams swapped ({0}/{1})."
+  },
+  "Retakes_Teams_Scrambled": {
+    "en-US": "{{green}}[Retakes]{{default}} Teams have been scrambled."
+  },
+  "Retakes_RoundType_Announce": {
+    "en-US": "{{green}}[Retakes]{{default}} {0} Round"
+  },
+  "Retakes_RoundType_AnnounceCenter": {
+    "en-US": "{0} Round"
+  },
+  "Retakes_BombSite_A": {
+    "en-US": "<img src='https://raw.githubusercontent.com/yonilerner/cs2-retakes-allocator/main/Resources/ASITE.png' class=''>"
+  },
+  "Retakes_BombSite_B": {
+    "en-US": "<img src='https://raw.githubusercontent.com/yonilerner/cs2-retakes-allocator/main/Resources/BSITE.png' class=''>"
+  },
+  "Retakes_Center_TMessage": {
+    "en-US": "<font color='red'>DEFEND</font> <font color='white'>SITE</font> <font color='red'>{0}</font> <br> {1} <br> {2} <font color='red'>T</font>  vs. {3} <font color='#0182FB'>CT</font>"
+  },
+  "Retakes_Center_CtMessage": {
+    "en-US": "<font color='green'>RETAKE</font> <font color='white'>SITE</font> <font color='green'>{0}</font> <br> {1} <br> {2} <font color='red'>T</font>  vs. {3} <font color='#0182FB'>CT</font>"
+  },
+  "Retakes_ChatAsite_Line1": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎回︎回︎回︎回︎"
+  },
+  "Retakes_ChatAsite_Line2": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎回︎回︎"
+  },
+  "Retakes_ChatAsite_Line3": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ 回︎回︎"
+  },
+  "Retakes_ChatAsite_Line4": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎回︎回︎回︎回︎"
+  },
+  "Retakes_ChatAsite_Line5": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ 回︎回︎"
+  },
+  "Retakes_ChatAsite_Line6": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ 回︎回︎"
+  },
+  "Retakes_ChatBsite_Line1": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎回︎回︎"
+  },
+  "Retakes_ChatBsite_Line2": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ ‎‏‏‎回︎"
+  },
+  "Retakes_ChatBsite_Line3": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎回︎回︎"
+  },
+  "Retakes_ChatBsite_Line4": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎ 回︎"
+  },
+  "Retakes_ChatBsite_Line5": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‏‏‎ ‎‎‏‏‎ ‎‏‏‎  回︎"
+  },
+  "Retakes_ChatBsite_Line6": {
+    "en-US": "{{darkblue}}[Retakes] {{default}} {{yellow}} 回︎回︎回︎回︎"
+  }
 }
