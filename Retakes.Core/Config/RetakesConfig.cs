@@ -63,17 +63,6 @@ public class CommandsSettings
     [JsonPropertyName("admin_flag")] public string Admin { get; set; } = "@css/admin";
 }
 
-public class DatabaseSettings
-{
-    /// <summary>
-    /// MySQL connection string for the retakes_user_settings table.
-    /// Maximum Pool Size kept low — shared server, don't exhaust connections.
-    /// </summary>
-    [JsonPropertyName("connection_string")]
-    public string ConnectionString { get; set; } =
-        "Server=127.0.0.1;Database=retakes;Uid=retakes;Pwd=CHANGE_ME;Maximum Pool Size=4";
-}
-
 public class RetakesConfig
 {
     [JsonPropertyName("game")]       public GameSettings       Game       { get; set; } = new();
@@ -81,7 +70,6 @@ public class RetakesConfig
     [JsonPropertyName("teams")]      public TeamSettings       Teams      { get; set; } = new();
     [JsonPropertyName("map_config")] public MapConfigSettings  MapConfig  { get; set; } = new();
     [JsonPropertyName("bomb")]       public BombSettings       Bomb       { get; set; } = new();
-    [JsonPropertyName("database")]   public DatabaseSettings   Database   { get; set; } = new();
     [JsonPropertyName("allocator")]  public AllocatorSettings  Allocator  { get; set; } = new();
     [JsonPropertyName("commands")]   public CommandsSettings   Commands   { get; set; } = new();
 }

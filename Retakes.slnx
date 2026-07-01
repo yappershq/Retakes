@@ -1,5 +1,4 @@
 <Solution>
   <Project Path="Retakes.Shared/Retakes.Shared.csproj" />
   <Project Path="Retakes.Core/Retakes.Core.csproj" />
-  <Project Path="Retakes.Database/Retakes.Database.csproj" />
 </Solution>

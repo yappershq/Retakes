@@ -33,9 +33,6 @@ internal sealed class ConfigModule : IModule
             Config = JsonSerializer.Deserialize<RetakesConfig>(text, opts) ?? new RetakesConfig();
         }
 
-        if (Config.Database.ConnectionString.Contains("CHANGE_ME", StringComparison.Ordinal))
-            _logger.LogWarning("[Retakes] Database password is still CHANGE_ME — update configs/retakes/retakes.json before use.");
-
         return true;
     }
 

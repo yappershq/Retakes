@@ -1,11 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Retakes.Allocator;
 using Retakes.Announcement;
 using Retakes.Bomb;
 using Retakes.Breaker;
 using Retakes.Config;
-using Retakes.Database;
 using Retakes.Defuse;
 using Retakes.Modules;
 using Retakes.Player;
@@ -64,13 +62,9 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<BombModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BombModule>());
 
-        // D1: RetakesDatabase — created lazily via static factory (reads DB connection string from config)
-        services.AddSingleton<RetakesDatabase>(sp =>
-        {
-            var cfg    = sp.GetRequiredService<ConfigModule>().Config;
-            var logger = sp.GetRequiredService<ILogger<RetakesDatabase>>();
-            return RetakesDatabase.Create(cfg.Database.ConnectionString, logger);
-        });
+        // D1: WeaponPrefsStore — wraps the optional IClientPreference cookie service.
+        services.AddSingleton<WeaponPrefsStore>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<WeaponPrefsStore>());
 
         // D1: real allocator — subscribes to OnAllocate in OAM
         services.AddSingleton<AllocatorModule>();

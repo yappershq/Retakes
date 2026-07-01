@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
-using Retakes.Database;
 using Retakes.Plugins;
 using Retakes.Shared;
 using Sharp.Shared.Enums;
@@ -43,7 +42,7 @@ internal sealed class BuyControlModule : IModule, IEventListener
     private readonly InterfaceBridge           _bridge;
     private readonly ConfigModule              _config;
     private readonly EventBus                  _bus;
-    private readonly RetakesDatabase           _db;
+    private readonly WeaponPrefsStore          _prefsStore;
     private readonly AllocatorModule           _allocatorModule;
 
     // Cached delegate for symmetric Install/Remove
@@ -60,14 +59,14 @@ internal sealed class BuyControlModule : IModule, IEventListener
         InterfaceBridge            bridge,
         ConfigModule               config,
         EventBus                   bus,
-        RetakesDatabase            db,
+        WeaponPrefsStore           prefsStore,
         AllocatorModule            allocatorModule)
     {
         _logger          = logger;
         _bridge          = bridge;
         _config          = config;
         _bus             = bus;
-        _db              = db;
+        _prefsStore      = prefsStore;
         _allocatorModule = allocatorModule;
         _canAcquirePre   = OnCanAcquirePre;
     }
@@ -214,10 +213,8 @@ internal sealed class BuyControlModule : IModule, IEventListener
 
     private void SavePreference(ulong steamId, CStrikeTeam team, WeaponAllocationType allocType, CsItem weapon)
     {
-        var setting = _db.GetCachedUserSettings(steamId);
-        setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
-            setting.WeaponPreferencesJson, team, allocType, weapon);
-        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        var prefsJson = WeaponPrefsHelper.SetPreference(_prefsStore.GetJson(steamId), team, allocType, weapon);
+        _prefsStore.SetJson(steamId, prefsJson);
 
         _logger.LogDebug("[Retakes][BuyControl] Saved pref: {SteamId} {Team} {Type} = {Weapon}",
             steamId, team, allocType, weapon);

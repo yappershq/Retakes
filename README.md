@@ -17,7 +17,7 @@ Retakes unifies four upstream CounterStrikeSharp plugins into a single ModSharp 
 
 - **Round flow** — picks a random bombsite each round, teleports players to spawns, auto-plants the bomb (optional), and enforces proper T/CT ratios.
 - **Queue system** — rotates players through an active roster, supports priority/immunity flags (VIP queue jump), and ejects idle spectators automatically.
-- **Weapon allocation** — per-player weapon preferences saved to MySQL; pistol, half-buy, and full-buy rounds with configurable weights; preferred-weapon (AWP) lottery with VIP bonus chances; nade budgets per team, round type, and map.
+- **Weapon allocation** — per-player weapon preferences persisted via ClientPreferences cookies; pistol, half-buy, and full-buy rounds with configurable weights; preferred-weapon (AWP) lottery with VIP bonus chances; nade budgets per team, round type, and map.
 - **Round-type voting** — end-of-round vote lets players choose the next round type.
 - **Zones** — per-map green/red AABB zones loaded from JSON; players who leave green zones or enter red zones are bounced back.
 - **Breakables & doors** — optionally break `func_breakable` entities and open `prop_door_rotating` at round start (for maps like nuke/vertigo).
@@ -37,7 +37,7 @@ Copy build output and config to your ModSharp installation (`<sharp>` = your `sh
 | `.assets/data/retakes/map_config/*.json` | `<sharp>/data/retakes/map_config/` |
 | `.assets/locales/retakes.json` | `<sharp>/locales/retakes.json` |
 
-Fill in `database.connection_string` in the deployed config and create the `retakes` MySQL database before starting the server. The `retakes_user_settings` table is created automatically on first connect.
+Weapon preferences persist via the `IClientPreference` cookie service (ModSharp.Sharp.Modules.ClientPreferences) — no database setup required. If ClientPreferences isn't installed, weapon preferences simply won't persist between sessions; everything else keeps working.
 
 ## Configuration
 
@@ -172,7 +172,7 @@ Zone configs live at `<sharp>/data/retakes/zones/<map>.json`. Format (from [osca
 This plugin is a from-scratch ModSharp port that unifies the following four upstream CounterStrikeSharp projects:
 
 - **[b3none/cs2-retakes](https://github.com/b3none/cs2-retakes)** — core round flow, queue management, spawn teleport, auto-plant, breakables, spawn editor, and event bus design.
-- **[yonilerner/cs2-retakes-allocator](https://github.com/yonilerner/cs2-retakes-allocator)** — weapon and nade allocation, round types, per-player preferences (DB), gun menus, round-type voting, and buy-blocking.
+- **[yonilerner/cs2-retakes-allocator](https://github.com/yonilerner/cs2-retakes-allocator)** — weapon and nade allocation, round types, per-player preferences, gun menus, round-type voting, and buy-blocking.
 - **[oscar-wos/Retakes-Zones](https://github.com/oscar-wos/Retakes-Zones)** — runtime AABB zone loading and player-bounce enforcement.
 - **[TICHOJEBEC-SK/cs2-RetakeDefuseFix](https://github.com/TICHOJEBEC-SK/cs2-RetakeDefuseFix)** — automatic defuse-kit distribution on bomb plant.
 

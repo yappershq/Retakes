@@ -31,9 +31,6 @@
   "bomb": {
     "is_auto_plant_enabled": true
   },
-  "database": {
-    "connection_string": "Server=127.0.0.1;Database=retakes;Uid=retakes;Pwd=CHANGE_ME;Maximum Pool Size=4"
-  },
   "commands": {
     "spawn_editor_flag": "@css/root",
     "map_config_flag": "@css/root",

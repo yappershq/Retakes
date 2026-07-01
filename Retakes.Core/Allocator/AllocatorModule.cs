@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
-using Retakes.Database;
-using Retakes.Database.Models;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
@@ -41,7 +39,7 @@ internal sealed class AllocatorModule : IModule
     private readonly ConfigModule             _config;
     private readonly QueueModule              _queueModule;
     private readonly EventBus                 _bus;
-    private readonly RetakesDatabase          _db;
+    private readonly WeaponPrefsStore         _prefsStore;
 
     private IAdminManager? _adminManager;
     private readonly Action _onAllocate;
@@ -59,14 +57,14 @@ internal sealed class AllocatorModule : IModule
         ConfigModule             config,
         QueueModule              queueModule,
         EventBus                 bus,
-        RetakesDatabase          db)
+        WeaponPrefsStore         prefsStore)
     {
         _logger      = logger;
         _bridge      = bridge;
         _config      = config;
         _queueModule = queueModule;
         _bus         = bus;
-        _db          = db;
+        _prefsStore  = prefsStore;
         _onAllocate  = HandleAllocate;
     }
 
@@ -140,9 +138,9 @@ internal sealed class AllocatorModule : IModule
             else if (controller.Team == CStrikeTeam.CT) ctIds.Add(steamId);
         }
 
-        // ── 2. Read weapon prefs from in-memory cache (no DB call on game thread) ──────────────────────
+        // ── 2. Read weapon prefs from the cookie cache (no I/O on game thread) ──────────────────────
         var allIds  = tIds.Concat(ctIds).ToList();
-        var prefMap = allIds.ToDictionary(id => id, id => _db.GetCachedUserSettings(id));
+        var prefMap = allIds.ToDictionary(id => id, id => _prefsStore.GetJson(id));
 
         // ── 3. Preferred-weapon (AWP) queue ───────────────────────────────
         HashSet<ulong> tPreferred  = [];
@@ -189,8 +187,8 @@ internal sealed class AllocatorModule : IModule
             if (pawn is null || !pawn.IsAlive) continue;
 
             var team   = controller.Team;
-            prefMap.TryGetValue(steamId, out var setting);
-            var prefs  = WeaponPrefsHelper.GetAllPreferences(setting, team);
+            prefMap.TryGetValue(steamId, out var prefsJson);
+            var prefs  = WeaponPrefsHelper.GetAllPreferences(prefsJson, team);
 
             var givePreferred = team == CStrikeTeam.TE
                 ? tPreferred.Contains(steamId)
@@ -262,9 +260,9 @@ internal sealed class AllocatorModule : IModule
     }
 
     private static bool HasPreferredPref(
-        Dictionary<ulong, UserSetting> prefMap, ulong id, CStrikeTeam team)
+        Dictionary<ulong, string?> prefMap, ulong id, CStrikeTeam team)
     {
-        prefMap.TryGetValue(id, out var setting);
-        return WeaponPrefsHelper.GetPreference(setting, team, WeaponAllocationType.Preferred) is not null;
+        prefMap.TryGetValue(id, out var prefsJson);
+        return WeaponPrefsHelper.GetPreference(prefsJson, team, WeaponAllocationType.Preferred) is not null;
     }
 }

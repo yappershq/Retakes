@@ -47,6 +47,9 @@ internal sealed class GameManager
 
     public void ResetPlayerScores() => _playerScores.Clear();
 
+    /// <summary>Drop a disconnected player's score so it can't linger until the next round reset.</summary>
+    public void RemovePlayerScore(ulong steamId64) => _playerScores.Remove(steamId64);
+
     // ── round transition ───────────────────────────────────────────────────
 
     /// <summary>

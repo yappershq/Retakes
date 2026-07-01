@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
-using Retakes.Database;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
@@ -26,7 +25,7 @@ internal sealed class AllocatorCommandsModule : IModule
     private readonly ConfigModule                     _config;
     private readonly QueueModule                      _queueModule;
     private readonly EventBus                         _bus;
-    private readonly RetakesDatabase                  _db;
+    private readonly WeaponPrefsStore                 _prefsStore;
     private readonly RoundTypeManager                 _roundTypeManager;
     private readonly NextRoundVoteManager             _voteManager;
 
@@ -43,7 +42,7 @@ internal sealed class AllocatorCommandsModule : IModule
         ConfigModule                     config,
         QueueModule                      queueModule,
         EventBus                         bus,
-        RetakesDatabase                  db,
+        WeaponPrefsStore                 prefsStore,
         RoundTypeManager                 roundTypeManager)
     {
         _logger           = logger;
@@ -51,7 +50,7 @@ internal sealed class AllocatorCommandsModule : IModule
         _config           = config;
         _queueModule      = queueModule;
         _bus              = bus;
-        _db               = db;
+        _prefsStore       = prefsStore;
         _roundTypeManager = roundTypeManager;
         _voteManager      = new NextRoundVoteManager(bridge, roundTypeManager);
         _onAllocate       = OnAllocate;
@@ -208,21 +207,19 @@ internal sealed class AllocatorCommandsModule : IModule
         }
 
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetCachedUserSettings(steamId);
+        var prefsJson = _prefsStore.GetJson(steamId);
 
         if (remove)
         {
-            setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
-                setting.WeaponPreferencesJson, team, allocType.Value, null);
-            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            prefsJson = WeaponPrefsHelper.SetPreference(prefsJson, team, allocType.Value, null);
+            _prefsStore.SetJson(steamId, prefsJson);
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_PrefRemoved",
                 weapon.Value.GetName(), allocType.Value, team);
         }
         else
         {
-            setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
-                setting.WeaponPreferencesJson, team, allocType.Value, weapon.Value);
-            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            prefsJson = WeaponPrefsHelper.SetPreference(prefsJson, team, allocType.Value, weapon.Value);
+            _prefsStore.SetJson(steamId, prefsJson);
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_PrefSet",
                 weapon.Value.GetName(), allocType.Value, team);
 
@@ -259,22 +256,20 @@ internal sealed class AllocatorCommandsModule : IModule
         if (!client.IsInGame) return;
 
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetCachedUserSettings(steamId);
+        var prefsJson = _prefsStore.GetJson(steamId);
 
-        var currentAwpPref = WeaponPrefsHelper.GetPreference(setting, CStrikeTeam.TE, WeaponAllocationType.Preferred);
+        var currentAwpPref = WeaponPrefsHelper.GetPreference(prefsJson, CStrikeTeam.TE, WeaponAllocationType.Preferred);
 
         if (currentAwpPref is not null)
         {
-            setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
-                setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, null);
-            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            prefsJson = WeaponPrefsHelper.SetPreference(prefsJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, null);
+            _prefsStore.SetJson(steamId, prefsJson);
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_AwpRemoved");
         }
         else
         {
-            setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
-                setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
-            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            prefsJson = WeaponPrefsHelper.SetPreference(prefsJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
+            _prefsStore.SetJson(steamId, prefsJson);
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_AwpSet");
         }
     }
@@ -410,7 +405,7 @@ internal sealed class AllocatorCommandsModule : IModule
             .Build();
     }
 
-    // ── DB helpers ────────────────────────────────────────────────────────────
+    // ── pref helpers ─────────────────────────────────────────────────────────
 
     private static string DisplayName(CsItem item)
         => item.GetName().Replace("weapon_", "").Replace("_", " ").ToUpperInvariant();
@@ -418,16 +413,14 @@ internal sealed class AllocatorCommandsModule : IModule
     private void SavePref(IGameClient client, CStrikeTeam team, WeaponAllocationType allocType, CsItem weapon)
     {
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetCachedUserSettings(steamId);
-        setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(setting.WeaponPreferencesJson, team, allocType, weapon);
-        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        var prefsJson = WeaponPrefsHelper.SetPreference(_prefsStore.GetJson(steamId), team, allocType, weapon);
+        _prefsStore.SetJson(steamId, prefsJson);
     }
 
     private void ClearPref(IGameClient client, CStrikeTeam team, WeaponAllocationType allocType)
     {
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetCachedUserSettings(steamId);
-        setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(setting.WeaponPreferencesJson, team, allocType, null);
-        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        var prefsJson = WeaponPrefsHelper.SetPreference(_prefsStore.GetJson(steamId), team, allocType, null);
+        _prefsStore.SetJson(steamId, prefsJson);
     }
 }

@@ -1,12 +1,11 @@
 using System.Text.Json;
-using Retakes.Database.Models;
 using Sharp.Shared.Enums;
 
 namespace Retakes.Allocator;
 
 /// <summary>
-/// Converts the raw JSON blob in <see cref="UserSetting.WeaponPreferencesJson"/> to/from
-/// typed <see cref="CsItem"/> preferences without pulling ORM/SqlSugar types into the helper.
+/// Converts the raw weapon-preferences JSON blob (stored via <see cref="WeaponPrefsStore"/> as a
+/// ClientPreferences cookie) to/from typed <see cref="CsItem"/> preferences.
 ///
 /// JSON shape: { "TE": { "FullBuyPrimary": "weapon_ak47" }, "CT": { "Secondary": "weapon_deagle" } }
 /// Keys are CStrikeTeam.ToString() and WeaponAllocationType.ToString().
@@ -16,10 +15,9 @@ internal static class WeaponPrefsHelper
     private static readonly JsonSerializerOptions _opts = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Get a single weapon preference from the JSON blob.</summary>
-    public static CsItem? GetPreference(UserSetting? setting, CStrikeTeam team, WeaponAllocationType allocType)
+    public static CsItem? GetPreference(string? json, CStrikeTeam team, WeaponAllocationType allocType)
     {
-        if (setting is null) return null;
-        var prefs = Deserialize(setting.WeaponPreferencesJson);
+        var prefs = Deserialize(json);
         var teamKey = team.ToString();
         if (!prefs.TryGetValue(teamKey, out var teamPrefs)) return null;
         if (!teamPrefs.TryGetValue(allocType.ToString(), out var weaponName)) return null;
@@ -27,12 +25,10 @@ internal static class WeaponPrefsHelper
     }
 
     /// <summary>Get all preferences for a team from the JSON blob.</summary>
-    public static Dictionary<WeaponAllocationType, CsItem> GetAllPreferences(
-        UserSetting? setting, CStrikeTeam team)
+    public static Dictionary<WeaponAllocationType, CsItem> GetAllPreferences(string? json, CStrikeTeam team)
     {
         var result = new Dictionary<WeaponAllocationType, CsItem>();
-        if (setting is null) return result;
-        var prefs = Deserialize(setting.WeaponPreferencesJson);
+        var prefs = Deserialize(json);
         var teamKey = team.ToString();
         if (!prefs.TryGetValue(teamKey, out var teamPrefs)) return result;
         foreach (var (typeKey, weaponName) in teamPrefs)
@@ -45,7 +41,7 @@ internal static class WeaponPrefsHelper
     }
 
     /// <summary>Returns a new JSON blob with the preference set (or cleared when item is null).</summary>
-    public static string SetPreference(string json, CStrikeTeam team, WeaponAllocationType allocType, CsItem? item)
+    public static string SetPreference(string? json, CStrikeTeam team, WeaponAllocationType allocType, CsItem? item)
     {
         var prefs = Deserialize(json);
         var teamKey = team.ToString();
