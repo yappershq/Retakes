@@ -44,6 +44,7 @@ internal sealed class BreakerModule : IModule, IEventListener
 
     public void OnPostInit()
     {
+        _bridge.EventManager.HookEvent("round_poststart");
         _bridge.EventManager.HookEvent("game_newmap");
         _bridge.EventManager.InstallEventListener(this);
     }

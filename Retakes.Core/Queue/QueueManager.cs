@@ -290,46 +290,6 @@ internal sealed class QueueManager
         }
     }
 
-    // ── team-change handler ────────────────────────────────────────────────
-
-    /// <summary>Returns true if the event should be considered handled (caller may block/suppress).</summary>
-    public bool HandlePlayerJoinedTeam(PlayerSlot slot, CStrikeTeam oldTeam, CStrikeTeam newTeam, bool isMidRound)
-    {
-        // spectator → any: enqueue if not already tracked
-        if (oldTeam == CStrikeTeam.Spectator && newTeam != CStrikeTeam.Spectator)
-        {
-            if (!IsActive(slot) && !IsQueued(slot))
-                AddToQueue(slot);
-            return false;
-        }
-
-        // active → spectator: remove from all queues
-        if (newTeam == CStrikeTeam.Spectator && IsActive(slot))
-        {
-            RemovePlayerFromQueues(slot);
-            return false;
-        }
-
-        // mid-round active player tries to switch teams — force back to spectator
-        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && IsActive(slot))
-        {
-            var client = _bridge.ClientManager.GetGameClient(slot);
-            if (client is { IsInGame: true })
-            {
-                var controller = client.GetPlayerController();
-                if (controller is not null && controller.IsValid())
-                {
-                    controller.ChangeTeam(CStrikeTeam.Spectator);
-                    RemovePlayerFromQueues(slot);
-                    AddToQueue(slot);
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     // ── priority ──────────────────────────────────────────────────────────
 
     private int GetQueuePriority(PlayerSlot slot, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
