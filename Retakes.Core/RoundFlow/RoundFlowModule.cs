@@ -8,6 +8,7 @@ using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
 using Retakes.Spawn;
+using Retakes.Utils;
 using Sharp.Shared.Enums;
 using Sharp.Shared.GameEvents;
 using Sharp.Shared.Listeners;
@@ -202,6 +203,21 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         _roundTypeManager.SetCurrentRoundType(roundType);
         _bus.FireAllocate(roundType);
 
+        // 6. Chat announcements: "Bombsite: A - Roundtype: Pistol" then "N T VS M CT. Good luck!"
+        var roundTypeKey = roundType switch
+        {
+            RoundType.Pistol  => "Retakes_RoundType_Pistol",
+            RoundType.HalfBuy => "Retakes_RoundType_HalfBuy",
+            _                 => "Retakes_RoundType_FullBuy",
+        };
+        var roundTypeStr = Loc.Format(_bridge.LocalizerManager, roundTypeKey);
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager,
+            "Retakes_Round_BombsiteRoundtype", _currentBombsite, roundTypeStr);
+
+        var numT  = _queueModule.QueueManager.RoundTerrorists.Count;
+        var numCt = _queueModule.QueueManager.RoundCounterTerrorists.Count;
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Round_Begun", numT, numCt);
+
         _logger.LogInformation("[Retakes] round_poststart: bombsite={Site}, planter={Planter}", _currentBombsite, PlanterSteamId);
     }
 
@@ -211,6 +227,12 @@ internal sealed class RoundFlowModule : IModule, IEventListener
     {
         _lastRoundWinner = evt.Winner;
         _logger.LogInformation("[Retakes] round_end: winner={Winner}", _lastRoundWinner);
+
+        var teamKey = _lastRoundWinner == CStrikeTeam.CT
+            ? "Retakes_Team_CounterTerrorists"
+            : "Retakes_Team_Terrorists";
+        var teamStr = Loc.Format(_bridge.LocalizerManager, teamKey);
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Round_Winner", teamStr);
     }
 
     // ── bomb_planted ───────────────────────────────────────────────────────

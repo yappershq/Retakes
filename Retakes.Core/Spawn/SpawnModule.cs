@@ -36,9 +36,10 @@ internal sealed class SpawnModule : IModule, IGameListener
         MapConfig    = new MapConfigService(_bridge.LoggerFactory.CreateLogger<MapConfigService>(), _bridge.DataPath);
         SpawnManager = new SpawnManager(_bridge.LoggerFactory.CreateLogger<SpawnManager>(), _bridge);
 
-        var mapName = _bridge.ModSharp.GetMapName() ?? "unknown";
-        LoadForMap(mapName);
-
+        // Don't call GetMapName() here — at plugin Init (cold server boot, no map loaded yet)
+        // the engine's server/game instance isn't valid yet and GetMapName() crashes the process
+        // ("sv is nullptr"). OnServerActivate (below) fires once a map is actually active and is
+        // the correct/only place to load spawns for the current map.
         return true;
     }
 

@@ -1,15 +1,7 @@
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Retakes.Allocator;
 
 namespace Retakes.Config;
-
-public class QueuePriorityFlagConfig
-{
-    [JsonPropertyName("display_name")] public string DisplayName { get; set; } = "VIP";
-    [JsonPropertyName("flag")]         public string Flag        { get; set; } = "@css/vip";
-    [JsonPropertyName("priority")]     public int    Priority    { get; set; } = 0;
-}
 
 public class GameSettings
 {
@@ -26,8 +18,6 @@ public class GameSettings
 
 public class QueueSettings
 {
-    [JsonPropertyName("priority_flags")]              public List<QueuePriorityFlagConfig> PriorityFlags          { get; set; } = [new QueuePriorityFlagConfig()];
-    [JsonPropertyName("immunity_flags")]              public List<QueuePriorityFlagConfig> ImmunityFlags          { get; set; } = [];
     [JsonPropertyName("should_remove_spectators")]    public bool ShouldRemoveSpectators    { get; set; } = true;
     [JsonPropertyName("should_auto_join_spectators")] public bool ShouldAutoJoinSpectators  { get; set; } = true;
 
@@ -59,14 +49,14 @@ public class BombSettings
 
 public class CommandsSettings
 {
-    /// <summary>Permission flag required for spawn-editor commands (!showspawns/!add/!remove/!nearest/!done).</summary>
-    [JsonPropertyName("spawn_editor_flag")] public string SpawnEditor { get; set; } = "@css/root";
+    /// <summary>Permission required for spawn-editor commands (!showspawns/!add/!remove/!nearest/!done).</summary>
+    [JsonPropertyName("spawn_editor_flag")] public string SpawnEditor { get; set; } = "retakes/root";
 
-    /// <summary>Permission flag required for map-config commands (!mapconfig/!mapconfigs).</summary>
-    [JsonPropertyName("map_config_flag")] public string MapConfig { get; set; } = "@css/root";
+    /// <summary>Permission required for map-config commands (!mapconfig/!mapconfigs).</summary>
+    [JsonPropertyName("map_config_flag")] public string MapConfig { get; set; } = "retakes/root";
 
-    /// <summary>Permission flag required for admin commands (!forcebombsite/!scramble/!debugqueues).</summary>
-    [JsonPropertyName("admin_flag")] public string Admin { get; set; } = "@css/admin";
+    /// <summary>Permission required for admin commands (!forcebombsite/!scramble/!debugqueues).</summary>
+    [JsonPropertyName("admin_flag")] public string Admin { get; set; } = "retakes/admin";
 }
 
 public class RetakesConfig

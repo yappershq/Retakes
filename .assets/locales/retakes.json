@@ -5,6 +5,24 @@
   "Retakes_Bombsite_Announce": {
     "en-US": "{{green}}[Retakes]{{default}} {{green}}Bombsite {0}!"
   },
+  "Retakes_Queue_Joined": {
+    "en-US": "{{green}}[Retakes]{{default}} You have joined the queue. Please wait for next round to begin."
+  },
+  "Retakes_Round_Winner": {
+    "en-US": "{{green}}[Retakes]{{default}} The {0} have won!"
+  },
+  "Retakes_Round_BombsiteRoundtype": {
+    "en-US": "{{green}}[Retakes]{{default}} Bombsite: {{red}}{0}{{default}} - Roundtype: {{red}}{1}"
+  },
+  "Retakes_Round_Begun": {
+    "en-US": "{{green}}[Retakes]{{default}} A new round has begun. {{red}}{0} T{{default}} VS {{blue}}{1} CT{{default}}. Good luck!"
+  },
+  "Retakes_Team_Terrorists": {
+    "en-US": "{{red}}Terrorists{{default}}"
+  },
+  "Retakes_Team_CounterTerrorists": {
+    "en-US": "{{blue}}Counter-Terrorists{{default}}"
+  },
   "Retakes_Bombsite_Center": {
     "en-US": "Bombsite {0}"
   },

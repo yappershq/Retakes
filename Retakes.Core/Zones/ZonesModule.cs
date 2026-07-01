@@ -90,7 +90,10 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener, IEv
     public void OnAllSharpModulesLoaded()
     {
         _bus.OnAnnounceBombsite += _onBombsiteAnnounced;
-        LoadZones();
+
+        // Don't call LoadZones() here — at OAM (cold boot) the engine's server instance isn't
+        // valid yet and GetMapName() (called inside it) crashes the process. OnServerActivate
+        // (below) fires once a map is actually active and covers the initial map too.
     }
 
     public void Shutdown()

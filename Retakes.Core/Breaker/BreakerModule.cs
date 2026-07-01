@@ -49,8 +49,10 @@ internal sealed class BreakerModule : IModule, IEventListener
         _bridge.EventManager.InstallEventListener(this);
     }
 
-    public void OnAllSharpModulesLoaded()
-        => BuildEntityActions();
+    // Don't call BuildEntityActions() here — at OAM (cold boot) the engine's server instance
+    // isn't valid yet and GetMapName() (called inside it) crashes the process. "game_newmap"
+    // fires once a map is actually active and covers the initial map too.
+    public void OnAllSharpModulesLoaded() { }
 
     public void Shutdown()
         => _bridge.EventManager.RemoveEventListener(this);

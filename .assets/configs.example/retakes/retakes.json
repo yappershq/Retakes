@@ -6,14 +6,6 @@
     "enable_fallback_allocation": false
   },
   "queue": {
-    "priority_flags": [
-      {
-        "display_name": "VIP",
-        "flag": "@css/vip",
-        "priority": 0
-      }
-    ],
-    "immunity_flags": [],
     "should_remove_spectators": true,
     "should_auto_join_spectators": true
   },
@@ -32,9 +24,9 @@
     "is_auto_plant_enabled": true
   },
   "commands": {
-    "spawn_editor_flag": "@css/root",
-    "map_config_flag": "@css/root",
-    "admin_flag": "@css/admin"
+    "spawn_editor_flag": "retakes/root",
+    "map_config_flag": "retakes/root",
+    "admin_flag": "retakes/admin"
   },
   "allocator": {
     "enabled": true,

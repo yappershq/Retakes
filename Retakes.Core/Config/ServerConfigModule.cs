@@ -118,7 +118,7 @@ internal sealed class ServerConfigModule : IModule, IGameListener
         mp_roundtime_defuse 0.25
         mp_autokick 0
         mp_c4timer 40
-        mp_freezetime 1
+        mp_freezetime 3
         mp_friendlyfire 0
         mp_round_restart_delay 2
         sv_talk_enemy_dead 0
@@ -133,6 +133,11 @@ internal sealed class ServerConfigModule : IModule, IGameListener
         mp_death_drop_defuser 1
         mp_death_drop_grenade 1
         mp_warmuptime 15
+
+        // 15-slot server: sv_visiblemaxplayers is runtime-settable (unlike the hard maxplayers
+        // connection cap, which is a launch parameter and must be set in the Pterodactyl startup
+        // command / server build, not here).
+        sv_visiblemaxplayers 15
 
         echo [Retakes] Config loaded!
 

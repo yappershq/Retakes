@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Queue;
+using Retakes.Utils;
 using Sharp.Shared.Enums;
 using Sharp.Shared.GameEvents;
 using Sharp.Shared.HookParams;
@@ -95,7 +96,10 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         _logger.LogInformation("[Retakes] Client connected: {SteamId}", (ulong)client.SteamId);
 
         if (_config.Config.Queue.ShouldAutoJoinSpectators)
+        {
             QueueManager.AddToQueue(client.Slot);
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Queue_Joined");
+        }
     }
 
     void IClientListener.OnClientPutInServer(IGameClient client) { }
@@ -182,6 +186,14 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
 
         var steamId = (ulong)client.SteamId;
         if (!steamId.IsValidSteamId()) return;
+
+        // RoundFlowModule.OnRoundPreStart skips QueueManager.Update() entirely during warmup, so
+        // nobody who joined during warmup is ever promoted to "active" until the first real round
+        // starts. Enforcing the active-roster slay here regardless would kill every warmup joiner
+        // on their very first spawn for no reason — skip the check during warmup, same free period
+        // the queue system itself treats as a no-op.
+        var rules = _bridge.ModSharp.GetGameRules();
+        if (rules is null || rules.IsWarmupPeriod) return;
 
         if (!QueueManager.IsActive(client.Slot))
         {

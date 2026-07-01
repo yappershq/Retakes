@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
-using Sharp.Modules.AdminManager.Shared;
 using Sharp.Shared.Enums;
 using Sharp.Shared.Units;
 
@@ -22,17 +21,12 @@ internal sealed class QueueManager
     private readonly bool[] _roundTerrorists         = new bool[MaxSlots];
     private readonly bool[] _roundCounterTerrorists  = new bool[MaxSlots];
 
-    private IAdminManager? _adminManager;
-
     public QueueManager(ILogger<QueueManager> logger, InterfaceBridge bridge, ConfigModule config)
     {
         _logger = logger;
         _bridge = bridge;
         _config = config;
     }
-
-    public void SetAdminManager(IAdminManager? adminManager)
-        => _adminManager = adminManager;
 
     // ── slot-array accessors ──────────────────────────────────────────────
 
@@ -156,16 +150,9 @@ internal sealed class QueueManager
     {
         PruneStale();
 
-        var maxActive     = _config.Config.Game.MaxPlayers;
-        var priorityFlags = _config.Config.Queue.PriorityFlags;
+        var maxActive = _config.Config.Game.MaxPlayers;
 
-        // sort by priority descending so VIPs get in first
-        var sorted = QueueSlots
-            .Select(slot => (slot, priority: GetQueuePriority(slot, _adminManager, priorityFlags)))
-            .OrderByDescending(x => x.priority)
-            .ToList();
-
-        foreach (var (slot, _) in sorted)
+        foreach (var slot in QueueSlots.ToList())
         {
             if (ActiveCount >= maxActive) break;
 
@@ -177,64 +164,6 @@ internal sealed class QueueManager
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;
             controller.ChangeTeam(CStrikeTeam.CT);
-        }
-
-        HandleQueuePriority();
-    }
-
-    /// <summary>
-    /// When the active roster is full, allow high-priority queued players to bump
-    /// lower-priority (and non-immune) active players.
-    /// </summary>
-    private void HandleQueuePriority()
-    {
-        var maxActive = _config.Config.Game.MaxPlayers;
-        if (ActiveCount < maxActive) return;
-
-        var priorityFlags = _config.Config.Queue.PriorityFlags;
-        var immunityFlags = _config.Config.Queue.ImmunityFlags;
-
-        var queued = QueueSlots
-            .Select(slot => (slot, priority: GetQueuePriority(slot, _adminManager, priorityFlags)))
-            .Where(x => x.priority > int.MinValue)
-            .OrderByDescending(x => x.priority)
-            .ThenBy(x => x.slot.AsPrimitive())
-            .ToList();
-
-        foreach (var (queuedSlot, queuedPriority) in queued)
-        {
-            var candidates = ActiveSlots
-                .Select(slot => (
-                    slot,
-                    priority: GetQueuePriority(slot, _adminManager, priorityFlags),
-                    immunity: GetQueueImmunityPriority(slot, _adminManager, immunityFlags)))
-                .Where(x => x.priority < queuedPriority && x.immunity < queuedPriority)
-                .OrderBy(x => x.priority)
-                .ThenByDescending(x => x.slot.AsPrimitive())
-                .ToList();
-
-            if (candidates.Count == 0) continue;
-
-            var replaceable = candidates[0].slot;
-
-            // bump the active player to spectator + queue
-            var bumpedClient = _bridge.ClientManager.GetGameClient(replaceable);
-            if (bumpedClient is { IsInGame: true })
-            {
-                var bumpedController = bumpedClient.GetPlayerController();
-                bumpedController?.ChangeTeam(CStrikeTeam.Spectator);
-            }
-            RemovePlayerFromQueues(replaceable);
-            AddToQueue(replaceable);
-
-            // promote the queued player to active + CT
-            AddToActive(queuedSlot);
-            var promotedClient = _bridge.ClientManager.GetGameClient(queuedSlot);
-            if (promotedClient is { IsInGame: true })
-            {
-                var promotedController = promotedClient.GetPlayerController();
-                promotedController?.ChangeTeam(CStrikeTeam.CT);
-            }
         }
     }
 
@@ -290,41 +219,4 @@ internal sealed class QueueManager
         }
     }
 
-    // ── priority ──────────────────────────────────────────────────────────
-
-    private int GetQueuePriority(PlayerSlot slot, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
-    {
-        if (adminMgr is null || flags.Count == 0)
-            return int.MinValue;
-
-        var steamId = _bridge.ClientManager.GetGameClient(slot)?.SteamId;
-        if (steamId is null)
-            return int.MinValue;
-
-        var best = int.MinValue;
-        foreach (var flag in flags)
-        {
-            if (adminMgr.GetAdmin(steamId.Value)?.HasPermission(flag.Flag) == true)
-                best = Math.Max(best, Math.Clamp(flag.Priority, 0, 100));
-        }
-        return best;
-    }
-
-    private int GetQueueImmunityPriority(PlayerSlot slot, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
-    {
-        if (adminMgr is null || flags.Count == 0)
-            return int.MinValue;
-
-        var steamId = _bridge.ClientManager.GetGameClient(slot)?.SteamId;
-        if (steamId is null)
-            return int.MinValue;
-
-        var best = int.MinValue;
-        foreach (var flag in flags)
-        {
-            if (adminMgr.GetAdmin(steamId.Value)?.HasPermission(flag.Flag) == true)
-                best = Math.Max(best, Math.Clamp(flag.Priority, 0, 100));
-        }
-        return best;
-    }
 }

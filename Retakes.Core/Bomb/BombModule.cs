@@ -46,6 +46,10 @@ internal sealed class BombModule : IModule, IEventListener
     private readonly ConfigModule         _config;
     private readonly RoundFlowModule      _roundFlow;
 
+    // cs_round_start_beep fires once per countdown beep (3-2-1), not once per round — guard
+    // against planting 2-3 bombs per round. Reset at round_poststart (new round begins).
+    private bool _plantedThisRound;
+
     // ── IEventListener ─────────────────────────────────────────────────────
     int IEventListener.ListenerVersion  => IEventListener.ApiVersion;
     int IEventListener.ListenerPriority => 10; // after RoundFlowModule (priority 0)
@@ -70,6 +74,7 @@ internal sealed class BombModule : IModule, IEventListener
     {
         // FireGameEvent only fires for hooked events; cs_round_start_beep = freeze-end timing.
         _bridge.EventManager.HookEvent("cs_round_start_beep");
+        _bridge.EventManager.HookEvent("round_poststart");
         _bridge.EventManager.InstallEventListener(this);
     }
 
@@ -82,7 +87,13 @@ internal sealed class BombModule : IModule, IEventListener
 
     void IEventListener.FireGameEvent(IGameEvent @event)
     {
-        // cs_round_start_beep fires when the freeze period ends (equivalent to round_freeze_end).
+        if (@event.Name.Equals("round_poststart", StringComparison.Ordinal))
+        {
+            _plantedThisRound = false;
+            return;
+        }
+
+        // cs_round_start_beep fires once per countdown beep (3-2-1), not once per freeze-end —
         // No typed ModSharp interface for this event; check by name.
         if (@event.Name.Equals("cs_round_start_beep", StringComparison.Ordinal))
             OnFreezeEnd();
@@ -92,6 +103,9 @@ internal sealed class BombModule : IModule, IEventListener
 
     private void OnFreezeEnd()
     {
+        if (_plantedThisRound)
+            return; // already handled this round — cs_round_start_beep fires 2-3x per round
+
         if (!_config.Config.Bomb.IsAutoPlantEnabled)
         {
             _logger.LogDebug("[Retakes][Bomb] Auto-plant disabled in config.");
@@ -134,6 +148,8 @@ internal sealed class BombModule : IModule, IEventListener
             _logger.LogWarning("[Retakes][Bomb] Planter pawn not alive at freeze-end — no auto-plant.");
             return;
         }
+
+        _plantedThisRound = true;
 
         if (TrySyntheticPlant(pawn, controller, rules, _roundFlow.CurrentBombsite))
         {
