@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Retakes.Allocator;
 using Retakes.Config;
 using Retakes.Plugins;
 using Sharp.Shared.Listeners;
@@ -10,6 +11,7 @@ internal sealed class SpawnModule : IModule, IGameListener
     private readonly InterfaceBridge          _bridge;
     private readonly ILogger<SpawnModule>     _logger;
     private readonly ConfigModule             _config;
+    private readonly RoundTypeManager         _roundTypeManager;
 
     public MapConfigService MapConfig    { get; private set; } = null!;
     public SpawnManager     SpawnManager { get; private set; } = null!;
@@ -17,11 +19,16 @@ internal sealed class SpawnModule : IModule, IGameListener
     int IGameListener.ListenerVersion  => IGameListener.ApiVersion;
     int IGameListener.ListenerPriority => 0;
 
-    public SpawnModule(InterfaceBridge bridge, ILogger<SpawnModule> logger, ConfigModule config)
+    public SpawnModule(
+        InterfaceBridge      bridge,
+        ILogger<SpawnModule> logger,
+        ConfigModule         config,
+        RoundTypeManager     roundTypeManager)
     {
-        _bridge = bridge;
-        _logger = logger;
-        _config = config;
+        _bridge           = bridge;
+        _logger           = logger;
+        _config           = config;
+        _roundTypeManager = roundTypeManager;
     }
 
     public bool Init()
@@ -58,5 +65,9 @@ internal sealed class SpawnModule : IModule, IGameListener
     {
         MapConfig.LoadForMap(mapName);
         SpawnManager.Rebuild(MapConfig);
+
+        // Thread the real map name into round-type sequencing so per-map nade budgets resolve
+        // (NadeHelpers looks up config by map name; null → always GLOBAL). Re-inits ManualOrdering.
+        _roundTypeManager.SetMap(mapName);
     }
 }

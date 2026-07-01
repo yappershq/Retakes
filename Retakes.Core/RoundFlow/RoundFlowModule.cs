@@ -75,7 +75,11 @@ internal sealed class RoundFlowModule : IModule, IEventListener
     public bool Init()
     {
         // Initialise round-type sequencing once config is loaded (ConfigModule.Init ran first).
-        _roundTypeManager.Initialize();
+        // SpawnModule.Init() (DI-registered earlier) already calls SetMap → Initialize once the map
+        // is known; only initialise here if that hasn't happened yet, so SetMap stays the single
+        // owner of round-type (re)init and we don't shuffle the order list twice.
+        if (_roundTypeManager.Map is null)
+            _roundTypeManager.Initialize();
         return true;
     }
 

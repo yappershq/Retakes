@@ -185,8 +185,10 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
 
         if (!QueueManager.IsActive(client.Slot))
         {
-            // not in queue — kill and move to spectator
-            pawn.AcceptInput("Kill");
+            // not in queue — slay (CommitSuicide equivalent) and move to spectator.
+            // NOT AcceptInput("Kill"): that DESTROYS the pawn entity → the "weird alive spectator"
+            // the source guards against. Slay() is the ModSharp CommitSuicide equivalent (matches RoundFlow).
+            pawn.Slay();
             controller.ChangeTeam(CStrikeTeam.Spectator);
         }
     }

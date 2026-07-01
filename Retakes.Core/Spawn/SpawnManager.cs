@@ -68,9 +68,26 @@ internal sealed class SpawnManager
         var tSpawnIdx  = 0;
         var ctSpawnIdx = 0;
 
-        // pick a dedicated planter spawn if available
+        // Pick a dedicated planter spawn. Prefer a CanBePlanter T spawn; if the site has none
+        // configured, fall back to ANY T spawn so the bomb still auto-plants (a missing planter
+        // means the round can never end). Never silently leave planterSpawn null when T spawns exist.
         var planterSpawns = tSpawns.Where(s => s.CanBePlanter).ToList();
-        Spawn? planterSpawn = planterSpawns.Count > 0 ? planterSpawns[rng.Next(planterSpawns.Count)] : null;
+        Spawn? planterSpawn;
+        if (planterSpawns.Count > 0)
+        {
+            planterSpawn = planterSpawns[rng.Next(planterSpawns.Count)];
+        }
+        else if (tSpawns.Count > 0)
+        {
+            planterSpawn = tSpawns[rng.Next(tSpawns.Count)];
+            _logger.LogWarning(
+                "[Retakes] Bombsite {Site} has no CanBePlanter T spawn — falling back to an arbitrary T spawn as planter. Add a planter spawn via the editor (!add T Y).",
+                bombsite);
+        }
+        else
+        {
+            planterSpawn = null; // no T spawns at all — nothing we can do; log below when a T needs one
+        }
 
         foreach (var steamId in activeSteamIds)
         {
@@ -91,25 +108,51 @@ internal sealed class SpawnManager
                     spawn         = planterSpawn;
                     planterSteamId = steamId;
                 }
-                else if (tSpawnIdx < tSpawns.Count)
+                else
                 {
-                    // skip the planterSpawn if we already used it
-                    spawn = tSpawns[tSpawnIdx++];
-                    if (spawn == planterSpawn) spawn = tSpawnIdx < tSpawns.Count ? tSpawns[tSpawnIdx++] : null;
+                    // Assign the next T spawn, skipping the one already used for the planter.
+                    // If we run out (more Ts than spawns), reuse spawns round-robin instead of
+                    // leaving overflow players stranded at engine default spawns.
+                    spawn = NextSpawn(tSpawns, ref tSpawnIdx, planterSpawn);
                 }
-                else spawn = null;
 
                 if (spawn is not null)
                     TeleportToSpawn(pawn, spawn);
             }
             else if (controller.Team == CStrikeTeam.CT)
             {
-                if (ctSpawnIdx < ctSpawns.Count)
-                    TeleportToSpawn(pawn, ctSpawns[ctSpawnIdx++]);
+                var spawn = NextSpawn(ctSpawns, ref ctSpawnIdx, skip: null);
+                if (spawn is not null)
+                    TeleportToSpawn(pawn, spawn);
             }
         }
 
+        if (planterSpawn is null && tSpawns.Count == 0)
+            _logger.LogWarning("[Retakes] Bombsite {Site} has NO T spawns configured — no bomb planter this round; round may not end.", bombsite);
+
         return planterSteamId;
+    }
+
+    /// <summary>
+    /// Return the next spawn from <paramref name="spawns"/>, advancing <paramref name="idx"/>.
+    /// Skips <paramref name="skip"/> (the planter spawn, already assigned). When the list is
+    /// exhausted (more players than spawns) it wraps round-robin so overflow players still get a
+    /// retakes spawn rather than being left at an engine default spawn.
+    /// </summary>
+    private static Spawn? NextSpawn(List<Spawn> spawns, ref int idx, Spawn? skip)
+    {
+        if (spawns.Count == 0) return null;
+
+        for (var attempts = 0; attempts < spawns.Count; attempts++)
+        {
+            if (idx >= spawns.Count) idx = 0; // wrap: reuse spawns for overflow players
+            var spawn = spawns[idx++];
+            if (spawn != skip) return spawn;
+        }
+
+        // Only reachable when Count == 1: the loop above exhausts every element for Count > 1.
+        // If that single spawn is the planter (skip), there's nothing else to hand out → null.
+        return spawns.Count == 1 && spawns[0] == skip ? null : spawns[0];
     }
 
     private static void TeleportToSpawn(Sharp.Shared.GameEntities.IPlayerPawn pawn, Spawn spawn)

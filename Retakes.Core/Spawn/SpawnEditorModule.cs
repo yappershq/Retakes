@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -545,28 +546,45 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
             ? (spawn.CanBePlanter ? ColorPlanter : ColorT)
             : ColorCt;
 
-        // Prop model — decoration is best-effort; a failed netvar must never crash the server.
-        var prop = _bridge.EntityManager.CreateEntityByName<IBaseModelEntity>("prop_dynamic");
-        if (prop is not null)
+        // House idiom: build the entity's KeyValues (origin/angles/model) and SpawnEntitySync — the
+        // KV carries model + placement and dispatches in one call, so there's no create/teleport/
+        // dispatch ordering footgun (mirrors TTT.Overlays SpawnEntitySync<IBaseEntity>("point_orient", kev)).
+        var kev = new Dictionary<string, KeyValuesVariantValueItem>
         {
+            ["origin"] = ToEkv(spawn.Position),
+            ["angles"] = ToEkv(spawn.Angles),
+            ["model"]  = spawn.Team == CStrikeTeam.TE ? TModel : CtModel,
+        };
+
+        IBaseModelEntity? prop;
+        try
+        {
+            prop = _bridge.EntityManager.SpawnEntitySync<IBaseModelEntity>("prop_dynamic", kev);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Retakes] SpawnEditor: prop_dynamic spawn failed — degrading to label only.");
+            prop = null;
+        }
+
+        if (prop is { IsValidEntity: true })
+        {
+            // Colour/glow have no clean KV — apply as best-effort post-spawn decoration; a fiddly
+            // glow netvar must never crash the server, so it degrades to a plain tint (or label only).
             try
             {
-                prop.SetModel(spawn.Team == CStrikeTeam.TE ? TModel : CtModel);
-                prop.DispatchSpawn();
                 prop.RenderColor = color;
 
-                // ponytail: glow is a nice-to-have; wrapped so a fiddly glow netvar degrades to plain tint.
                 var glow = prop.GetGlowProperty();
                 if (glow is not null)
                 {
-                    glow.Glowing            = true;
-                    glow.GlowColorOverride  = color;
-                    glow.GlowType           = 3;
-                    glow.GlowRangeMax       = 2000;
-                    glow.GlowRangeMin       = 25;
+                    glow.Glowing           = true;
+                    glow.GlowColorOverride = color;
+                    glow.GlowType          = 3;
+                    glow.GlowRangeMax      = 2000;
+                    glow.GlowRangeMin      = 25;
                 }
 
-                prop.Teleport(spawn.Position, spawn.Angles, new Vector());
                 _vizEntities.Add(prop.Index);
             }
             catch (Exception ex)
@@ -581,37 +599,56 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
     private void ShowLabel(Spawn spawn, Color32 color)
     {
-        var text = _bridge.EntityManager.CreateEntityByName<IWorldText>("point_worldtext");
-        if (text is null) return;
+        var teamName = spawn.Team == CStrikeTeam.TE ? "T" : "CT";
+        var planter  = spawn.CanBePlanter
+            ? Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_LabelPlanter")
+            : "";
+        var message = Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_Label",
+            teamName, planter, spawn.Bombsite,
+            spawn.Position.X.ToString("F0"), spawn.Position.Y.ToString("F0"), spawn.Position.Z.ToString("F0"));
 
+        var textPos   = new Vector(spawn.Position.X, spawn.Position.Y, spawn.Position.Z + 80f);
+        var textAngle = new Vector(spawn.Angles.X, spawn.Angles.Y + 90f, spawn.Angles.Z + 90f);
+
+        // Every point_worldtext property maps to a spawn KeyValue, so the whole label spawns
+        // atomically via SpawnEntitySync — no separate SetNetVar / Teleport / DispatchSpawn.
+        // KV key names are the CPointWorldText FGD keys (verified via mcp get_entity point_worldtext):
+        // origin/angles/message/enabled/fullbright/font_size/world_units_per_pixel/color (Color255Alpha).
+        var kev = new Dictionary<string, KeyValuesVariantValueItem>
+        {
+            ["origin"]                = ToEkv(textPos),
+            ["angles"]                = ToEkv(textAngle),
+            ["message"]               = message,
+            ["enabled"]               = true,
+            ["fullbright"]            = true,
+            ["font_size"]             = 25f,
+            ["world_units_per_pixel"] = 0.1f,
+            ["color"]                 = ToEkvColor(color),
+        };
+
+        IWorldText? text;
         try
         {
-            var teamName = spawn.Team == CStrikeTeam.TE ? "T" : "CT";
-            var planter  = spawn.CanBePlanter
-                ? Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_LabelPlanter")
-                : "";
-            text.Message = Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_Label",
-                teamName, planter, spawn.Bombsite,
-                spawn.Position.X.ToString("F0"), spawn.Position.Y.ToString("F0"), spawn.Position.Z.ToString("F0"));
-            text.Enabled          = true;
-            text.FontSize         = 25f;
-            text.Color            = color;
-            text.FullBright       = true;
-            text.SetNetVar("m_flWorldUnitsPerPx", 0.1f); // no typed property on IWorldText; verified netvar
-
-            var textPos   = new Vector(spawn.Position.X, spawn.Position.Y, spawn.Position.Z + 80f);
-            var textAngle = new Vector(spawn.Angles.X, spawn.Angles.Y + 90f, spawn.Angles.Z + 90f);
-            text.Teleport(textPos, textAngle, new Vector());
-            text.DispatchSpawn();
-
-            _vizEntities.Add(text.Index);
+            text = _bridge.EntityManager.SpawnEntitySync<IWorldText>("point_worldtext", kev);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[Retakes] SpawnEditor: worldtext label failed.");
-            if (text.IsValidEntity) text.Kill();
+            _logger.LogWarning(ex, "[Retakes] SpawnEditor: worldtext label spawn failed.");
+            return;
         }
+
+        if (text is { IsValidEntity: true })
+            _vizEntities.Add(text.Index);
     }
+
+    // ── EKV formatters ─────────────────────────────────────────────────────────
+    // "X Y Z" for origin/angles, "R G B A" for Color255Alpha — matches the JSON/Hammer format.
+
+    private static string ToEkv(Vector v)
+        => string.Create(CultureInfo.InvariantCulture, $"{v.X} {v.Y} {v.Z}");
+
+    private static string ToEkvColor(Color32 c)
+        => string.Create(CultureInfo.InvariantCulture, $"{c.R} {c.G} {c.B} {c.A}");
 
     private void ClearViz()
     {

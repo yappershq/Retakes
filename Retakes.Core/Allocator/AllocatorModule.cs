@@ -40,6 +40,7 @@ internal sealed class AllocatorModule : IModule
     private readonly QueueModule              _queueModule;
     private readonly EventBus                 _bus;
     private readonly WeaponPrefsStore         _prefsStore;
+    private readonly RoundTypeManager         _roundTypeManager;
 
     private IAdminManager? _adminManager;
     private readonly Action _onAllocate;
@@ -57,15 +58,17 @@ internal sealed class AllocatorModule : IModule
         ConfigModule             config,
         QueueModule              queueModule,
         EventBus                 bus,
-        WeaponPrefsStore         prefsStore)
+        WeaponPrefsStore         prefsStore,
+        RoundTypeManager         roundTypeManager)
     {
-        _logger      = logger;
-        _bridge      = bridge;
-        _config      = config;
-        _queueModule = queueModule;
-        _bus         = bus;
-        _prefsStore  = prefsStore;
-        _onAllocate  = HandleAllocate;
+        _logger           = logger;
+        _bridge           = bridge;
+        _config           = config;
+        _queueModule      = queueModule;
+        _bus              = bus;
+        _prefsStore       = prefsStore;
+        _roundTypeManager = roundTypeManager;
+        _onAllocate       = HandleAllocate;
     }
 
     // ── IModule lifecycle ──────────────────────────────────────────────────
@@ -163,9 +166,11 @@ internal sealed class AllocatorModule : IModule
         }
 
         // ── 4. Nade pools (team-level, then distribute per player) ─────────
-        // TODO Phase E: pass RoundTypeManager.Map for per-map nade settings (null=GLOBAL for now)
-        var tNades  = NadeHelpers.GetUtilForTeam(null, roundType, CStrikeTeam.TE, tIds.Count, allocCfg);
-        var ctNades = NadeHelpers.GetUtilForTeam(null, roundType, CStrikeTeam.CT, ctIds.Count, allocCfg);
+        // Thread the real map name so per-map nade budgets resolve (falls back to GLOBAL inside
+        // NadeHelpers when the map has no override). RoundTypeManager.Map is set on map change.
+        var map     = _roundTypeManager.Map;
+        var tNades  = NadeHelpers.GetUtilForTeam(map, roundType, CStrikeTeam.TE, tIds.Count, allocCfg);
+        var ctNades = NadeHelpers.GetUtilForTeam(map, roundType, CStrikeTeam.CT, ctIds.Count, allocCfg);
 
         var nadesByPlayer = new Dictionary<ulong, List<CsItem>>();
         NadeHelpers.AllocateNadesToPlayers(tNades,  tIds,  nadesByPlayer);

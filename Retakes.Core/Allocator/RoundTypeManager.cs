@@ -58,10 +58,16 @@ internal sealed class RoundTypeManager
         _orderPosition = 0;
     }
 
+    /// <summary>
+    /// Set the current map and re-initialise round-type sequencing so map-specific nade
+    /// configs (and ManualOrdering position) take effect. Called on map change from SpawnModule.
+    /// </summary>
     public void SetMap(string map)
     {
+        if (string.Equals(_map, map, StringComparison.OrdinalIgnoreCase)) return;
+
         _map = map;
-        // TODO Phase E: re-initialise on map change so map-specific nade configs take effect
+        Initialize();
     }
 
     public string? Map => _map;

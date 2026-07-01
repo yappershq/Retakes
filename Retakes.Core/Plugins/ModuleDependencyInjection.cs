@@ -32,6 +32,10 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<ConfigModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<ConfigModule>());
 
+        // Server convars (retakes.cfg) — write + exec on map load. mp_give_player_c4 0 is load-bearing.
+        services.AddSingleton<ServerConfigModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<ServerConfigModule>());
+
         services.AddSingleton<SpawnModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<SpawnModule>());
 
