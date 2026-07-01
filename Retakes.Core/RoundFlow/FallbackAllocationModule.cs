@@ -60,6 +60,13 @@ internal sealed class FallbackAllocationModule : IModule
 
     private void HandleAllocate()
     {
+        // Skip if the real AllocatorModule (Phase D) is active.
+        if (_config.Config.Allocator.Enabled)
+        {
+            _logger.LogDebug("[Retakes] FallbackAllocation skipped (AllocatorModule is active).");
+            return;
+        }
+
         if (!_config.Config.Game.EnableFallbackAllocation)
         {
             _logger.LogDebug("[Retakes] FallbackAllocation skipped (disabled in config).");

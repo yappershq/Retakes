@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
+using Retakes.Allocator;
 using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Queue;
@@ -32,6 +33,7 @@ internal sealed class RoundFlowModule : IModule, IEventListener
     private readonly QueueModule              _queueModule;
     private readonly SpawnModule              _spawnModule;
     private readonly EventBus                 _bus;
+    private readonly RoundTypeManager         _roundTypeManager;
 
     // ── round state ────────────────────────────────────────────────────────
     private Bombsite    _currentBombsite = Bombsite.A;
@@ -54,19 +56,26 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         ConfigModule             config,
         QueueModule              queueModule,
         SpawnModule              spawnModule,
-        EventBus                 bus)
+        EventBus                 bus,
+        RoundTypeManager         roundTypeManager)
     {
-        _logger      = logger;
-        _bridge      = bridge;
-        _config      = config;
-        _queueModule = queueModule;
-        _spawnModule = spawnModule;
-        _bus         = bus;
+        _logger           = logger;
+        _bridge           = bridge;
+        _config           = config;
+        _queueModule      = queueModule;
+        _spawnModule      = spawnModule;
+        _bus              = bus;
+        _roundTypeManager = roundTypeManager;
     }
 
     // ── IModule lifecycle ──────────────────────────────────────────────────
 
-    public bool Init() => true;
+    public bool Init()
+    {
+        // Initialise round-type sequencing once config is loaded (ConfigModule.Init ran first).
+        _roundTypeManager.Initialize();
+        return true;
+    }
 
     public void OnPostInit()
         => _bridge.EventManager.InstallEventListener(this);
@@ -166,9 +175,10 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         // 4. Publish bombsite selection to all subscribers (AnnouncementModule, ZonesModule, etc.)
         _bus.FireAnnounceBombsite(_currentBombsite);
 
-        // 5. Fire allocation event so FallbackAllocationModule / Phase-D AllocatorModule can give weapons.
-        //    Phase D will derive the actual RoundType; B2 always uses FullBuy as a placeholder.
-        _bus.FireAllocate(RoundType.FullBuy);
+        // 5. Ask RoundTypeManager for the economy tier; publish to bus + AllocatorModule.
+        var roundType = _roundTypeManager.GetNextRoundType();
+        _roundTypeManager.SetCurrentRoundType(roundType);
+        _bus.FireAllocate(roundType);
 
         _logger.LogInformation("[Retakes] round_poststart: bombsite={Site}, planter={Planter}", _currentBombsite, PlanterSteamId);
     }

@@ -13,5 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Retakes.Shared\Retakes.Shared.csproj" />
+    <ProjectReference Include="..\Retakes.Database\Retakes.Database.csproj" />
   </ItemGroup>
 </Project>

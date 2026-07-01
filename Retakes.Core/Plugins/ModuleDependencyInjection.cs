@@ -1,8 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Retakes.Allocator;
 using Retakes.Announcement;
 using Retakes.Bomb;
 using Retakes.Breaker;
 using Retakes.Config;
+using Retakes.Database;
 using Retakes.Defuse;
 using Retakes.Modules;
 using Retakes.Player;
@@ -34,11 +37,14 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<PlayerLifecycleModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<PlayerLifecycleModule>());
 
-        // B2: round flow orchestration
+        // D1: RoundTypeManager — depends on ConfigModule (singleton, safe after config Init)
+        services.AddSingleton<RoundTypeManager>();
+
+        // B2: round flow orchestration (now injects RoundTypeManager)
         services.AddSingleton<RoundFlowModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<RoundFlowModule>());
 
-        // B2: fallback weapon allocator (subscribes to OnAllocate in OAM)
+        // B2: fallback weapon allocator — no-op when AllocatorModule is enabled
         services.AddSingleton<FallbackAllocationModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<FallbackAllocationModule>());
 
@@ -57,6 +63,18 @@ internal static class ModuleDependencyInjection
         // C2: bomb auto-plant (must be after RoundFlowModule which sets PlanterSteamId)
         services.AddSingleton<BombModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BombModule>());
+
+        // D1: RetakesDatabase — created lazily via static factory (reads DB connection string from config)
+        services.AddSingleton<RetakesDatabase>(sp =>
+        {
+            var cfg    = sp.GetRequiredService<ConfigModule>().Config;
+            var logger = sp.GetRequiredService<ILogger<RetakesDatabase>>();
+            return RetakesDatabase.Create(cfg.Database.ConnectionString, logger);
+        });
+
+        // D1: real allocator — subscribes to OnAllocate in OAM
+        services.AddSingleton<AllocatorModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<AllocatorModule>());
 
         return services;
     }
