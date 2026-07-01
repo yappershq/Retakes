@@ -178,6 +178,10 @@ internal sealed class AnnouncementModule : IModule, IClientListener, IEventListe
                 if (client is not { IsInGame: true }) continue;
                 if (IsVoiceMuted(client.SteamId, client.Slot)) continue;
 
+                // ponytail: EXPERIMENTAL, opt-in (config default off). The `play <path>` client
+                // command + this VO asset path are UNVERIFIED — a server-issued `play` may be
+                // client-blocked and the exact CS2 agent-VO soundevent/path needs live confirmation.
+                // If it turns out silent, switch to a real soundevent emit. Do not treat as working.
                 var announcer = Announcers[Random.Shared.Next(Announcers.Length)];
                 client.Command($"play sounds/vo/agents/{announcer}/loc_{siteLower}_01");
             }

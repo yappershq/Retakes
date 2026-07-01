@@ -154,7 +154,7 @@ internal sealed class BuyControlModule : IModule, IEventListener
         // Allocation-time give already handles preferred via RNG/pref queue at round start.
         if (WeaponHelpers.IsPreferred(team, csItem.Value)) return Block();
 
-        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, csItem.Value);
+        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, csItem.Value, roundType);
         var isValid   = allocType is not null
                      && WeaponHelpers.IsAllocationTypeValidForRound(allocType.Value, roundType);
 
@@ -206,7 +206,7 @@ internal sealed class BuyControlModule : IModule, IEventListener
 
         var team      = controller.Team;
         var roundType = _bus.CurrentRoundType;
-        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, csItem.Value);
+        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, csItem.Value, roundType);
         var isValid   = allocType is not null
                      && WeaponHelpers.IsAllocationTypeValidForRound(allocType.Value, roundType);
         var isPreferred = WeaponHelpers.IsPreferred(team, csItem.Value);

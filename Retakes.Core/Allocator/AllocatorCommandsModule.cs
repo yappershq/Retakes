@@ -212,7 +212,9 @@ internal sealed class AllocatorCommandsModule : IModule
             return;
         }
 
-        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, weapon.Value);
+        // Classify by the current round so a pistol saves to its correct slot (Secondary on buy
+        // rounds, PistolRound on pistol rounds) instead of always the first-match PistolRound.
+        var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, weapon.Value, _bus.CurrentRoundType);
         if (allocType is null)
         {
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_NotValidForTeam", weaponInput, team);

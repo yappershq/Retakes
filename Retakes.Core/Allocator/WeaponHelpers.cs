@@ -182,14 +182,26 @@ public static class WeaponHelpers
             .ToList();
     }
 
-    /// <summary>Get the WeaponAllocationType for a weapon+team combination.</summary>
-    public static WeaponAllocationType? GetAllocationTypeForWeapon(CStrikeTeam team, CsItem weapon)
+    /// <summary>
+    /// Get the WeaponAllocationType for a weapon+team combination.
+    /// A pistol lives in BOTH the PistolRound and Secondary sets, so when a <paramref name="round"/>
+    /// is supplied we return the alloc type that is actually VALID for that round — otherwise a
+    /// buy-round pistol would classify as PistolRound (first insertion) and get blocked/stripped
+    /// (money loss) and prefs would save to the wrong slot. With no round we keep the first match.
+    /// </summary>
+    public static WeaponAllocationType? GetAllocationTypeForWeapon(CStrikeTeam team, CsItem weapon, RoundType? round = null)
     {
         if (team != CStrikeTeam.TE && team != CStrikeTeam.CT) return null;
         var byType = _validWeaponsByTeamAndType[team];
+        WeaponAllocationType? firstMatch = null;
         foreach (var (allocType, set) in byType)
-            if (set.Contains(weapon)) return allocType;
-        return null;
+        {
+            if (!set.Contains(weapon)) continue;
+            firstMatch ??= allocType;
+            if (round is null || IsAllocationTypeValidForRound(allocType, round.Value))
+                return allocType;
+        }
+        return firstMatch;
     }
 
     /// <summary>Get all RoundTypes where the given allocation type is valid.</summary>
