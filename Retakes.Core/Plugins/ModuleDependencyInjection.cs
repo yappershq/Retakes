@@ -25,9 +25,11 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<BootstrapModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BootstrapModule>());
 
-        // Default VIP provider — "nobody is VIP" until Retakes.Vip (CHUNK 3) registers a real one.
-        // Not yet consumed by QueueManager priority logic in this chunk (deferred — see CHUNK 3).
-        services.AddSingleton<IRetakesVipProvider, DefaultVipProvider>();
+        // VIP provider — defaults to "nobody is VIP"; optionally adopts an externally-published
+        // IRetakesVipProvider (the separate Retakes.Vip module bridging Vip.Shared) resolved in OAM.
+        services.AddSingleton<VipProviderResolver>();
+        services.AddSingleton<IRetakesVipProvider>(sp => sp.GetRequiredService<VipProviderResolver>());
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<VipProviderResolver>());
 
         services.AddSingleton<ConfigModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<ConfigModule>());

@@ -3,7 +3,6 @@ using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
-using Sharp.Modules.AdminManager.Shared;
 using Sharp.Shared.Enums;
 using Sharp.Shared.Objects;
 using Sharp.Shared.Units;
@@ -31,9 +30,6 @@ namespace Retakes.Allocator;
 /// </summary>
 internal sealed class AllocatorModule : IModule
 {
-    private const string VipPermission = "retakes:vip";
-    private const string ModuleIdentity = "Retakes";
-
     private readonly ILogger<AllocatorModule> _logger;
     private readonly InterfaceBridge          _bridge;
     private readonly ConfigModule             _config;
@@ -41,8 +37,8 @@ internal sealed class AllocatorModule : IModule
     private readonly EventBus                 _bus;
     private readonly WeaponPrefsStore         _prefsStore;
     private readonly RoundTypeManager         _roundTypeManager;
+    private readonly IRetakesVipProvider      _vipProvider;
 
-    private IAdminManager? _adminManager;
     private readonly Action _onAllocate;
 
     /// <summary>
@@ -59,7 +55,8 @@ internal sealed class AllocatorModule : IModule
         QueueModule              queueModule,
         EventBus                 bus,
         WeaponPrefsStore         prefsStore,
-        RoundTypeManager         roundTypeManager)
+        RoundTypeManager         roundTypeManager,
+        IRetakesVipProvider      vipProvider)
     {
         _logger           = logger;
         _bridge           = bridge;
@@ -68,6 +65,7 @@ internal sealed class AllocatorModule : IModule
         _bus              = bus;
         _prefsStore       = prefsStore;
         _roundTypeManager = roundTypeManager;
+        _vipProvider      = vipProvider;
         _onAllocate       = HandleAllocate;
     }
 
@@ -85,21 +83,6 @@ internal sealed class AllocatorModule : IModule
 
     public void OnAllSharpModulesLoaded()
     {
-        // Resolve IAdminManager (optional — VIP weighting degrades gracefully without it).
-        var adminIface = _bridge.SharpModuleManager
-            .GetOptionalSharpModuleInterface<IAdminManager>(IAdminManager.Identity);
-        _adminManager = adminIface?.Instance;
-
-        if (_adminManager is not null)
-        {
-            // Register "retakes:vip" as a known permission so wildcard admins ("*") resolve it.
-            _adminManager.MountAdminManifest(ModuleIdentity, () => new AdminTableManifest(
-                PermissionCollection: new() { { VipPermission, new HashSet<string>() } },
-                Roles:  [],
-                Admins: []
-            ));
-        }
-
         _bus.OnAllocate += _onAllocate;
         _logger.LogInformation("[Retakes] AllocatorModule subscribed to OnAllocate.");
     }
@@ -258,12 +241,8 @@ internal sealed class AllocatorModule : IModule
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    private bool IsVip(ulong steamId)
-    {
-        if (_adminManager is null) return false;
-        var admin = _adminManager.GetAdmin((SteamID)steamId);
-        return admin?.HasPermission(VipPermission) == true;
-    }
+    /// <summary>Admins are NOT VIP — VIP is purely whatever <see cref="IRetakesVipProvider"/> says.</summary>
+    private bool IsVip(ulong steamId) => _vipProvider.IsVip((SteamID)steamId);
 
     private static bool HasPreferredPref(
         Dictionary<ulong, string?> prefMap, ulong id, CStrikeTeam team)

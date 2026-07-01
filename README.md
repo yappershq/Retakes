@@ -17,7 +17,7 @@ Retakes unifies four upstream CounterStrikeSharp plugins into a single ModSharp 
 
 - **Round flow** — picks a random bombsite each round, teleports players to spawns, auto-plants the bomb (optional), and enforces proper T/CT ratios.
 - **Queue system** — rotates players through an active roster, supports priority/immunity flags (VIP queue jump), and ejects idle spectators automatically.
-- **Weapon allocation** — per-player weapon preferences persisted via ClientPreferences cookies; pistol, half-buy, and full-buy rounds with configurable weights; preferred-weapon (AWP) lottery with VIP bonus chances; nade budgets per team, round type, and map.
+- **Weapon allocation** — per-player weapon preferences persisted via ClientPreferences cookies; pistol, half-buy, and full-buy rounds with configurable weights; preferred-weapon (AWP) lottery with VIP bonus chances (see [VIP](#vip-optional) below); nade budgets per team, round type, and map.
 - **Round-type voting** — end-of-round vote lets players choose the next round type.
 - **Zones** — per-map green/red AABB zones loaded from JSON; players who leave green zones or enter red zones are bounced back.
 - **Breakables & doors** — optionally break `func_breakable` entities and open `prop_door_rotating` at round start (for maps like nuke/vertigo).
@@ -38,6 +38,28 @@ Copy build output and config to your ModSharp installation (`<sharp>` = your `sh
 | `.assets/locales/retakes.json` | `<sharp>/locales/retakes.json` |
 
 Weapon preferences persist via the `IClientPreference` cookie service (ModSharp.Sharp.Modules.ClientPreferences) — no database setup required. If ClientPreferences isn't installed, weapon preferences simply won't persist between sessions; everything else keeps working.
+
+## VIP (optional)
+
+`Retakes.Core` is VIP-agnostic — it never talks to AdminManager permissions or any specific VIP
+plugin. Instead it defines a small contract, `IRetakesVipProvider` (`bool IsVip(SteamID)`), and
+defaults to "nobody is VIP" out of the box. Admins are **not** treated as VIP.
+
+To grant VIP-driven perks (preferred-weapon lottery bonus chances, queue priority via
+`priority_flags`), deploy the separate **`Retakes.Vip`** module alongside `Retakes.Core`:
+
+| From | To |
+|------|-----|
+| `.build/modules/Retakes.Vip/` | `<sharp>/modules/Retakes.Vip/` |
+
+`Retakes.Vip` bridges our house [Vip](https://github.com/yappershq) plugin's `IVipShared` into
+`IRetakesVipProvider` and publishes it on the ModSharp module bus. `Retakes.Core` picks it up
+automatically in `OnAllModulesLoaded` if present; if `Retakes.Vip` (or the underlying `Vip` plugin)
+isn't installed, Retakes keeps running fine with VIP features simply inert.
+
+Running a different VIP system? Implement `IRetakesVipProvider` yourself and register it the same
+way — `ISharpModuleManager.RegisterSharpModuleInterface<IRetakesVipProvider>(owner, IRetakesVipProvider.Identity, yourImpl)`
+from your own module's `PostInit`/`OnAllModulesLoaded`. No changes to Retakes.Core needed.
 
 ## Configuration
 

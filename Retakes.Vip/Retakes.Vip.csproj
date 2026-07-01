@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Retakes.Vip</AssemblyName>
+    <RootNamespace>Retakes.Vip</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Optional third-party module: bridges our house Vip plugin into Retakes' VIP-agnostic
+    IRetakesVipProvider contract. Deploy ONLY on servers that also run the Vip plugin — Retakes.Core
+    itself never references Vip.Shared and works fine without this module (default: nobody is VIP).
+    Referenced by absolute path like cs2-hextags does for the same contract (sibling repo, not a
+    NuGet package). Private="false" so Vip.Shared.dll is NOT copied into THIS module's own output —
+    it must resolve against the copy Vip.Core already ships to {sharp}/shared/, per
+    feedback_modsharp_foreign_shared_refasm_copy — a duplicate copy under a different ALC breaks
+    type identity across the SharpModuleManager interface boundary.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="/home/claude/cs2-vip/Vip.Shared/Vip.Shared.csproj" Private="false" />
+    <ProjectReference Include="..\Retakes.Shared\Retakes.Shared.csproj" />
+  </ItemGroup>
+</Project>
