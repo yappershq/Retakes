@@ -51,6 +51,18 @@ public class BombSettings
     [JsonPropertyName("is_auto_plant_enabled")] public bool IsAutoPlantEnabled { get; set; } = true;
 }
 
+public class CommandsSettings
+{
+    /// <summary>Permission flag required for spawn-editor commands (!showspawns/!add/!remove/!nearest/!done).</summary>
+    [JsonPropertyName("spawn_editor_flag")] public string SpawnEditor { get; set; } = "@css/root";
+
+    /// <summary>Permission flag required for map-config commands (!mapconfig/!mapconfigs).</summary>
+    [JsonPropertyName("map_config_flag")] public string MapConfig { get; set; } = "@css/root";
+
+    /// <summary>Permission flag required for admin commands (!forcebombsite/!scramble/!debugqueues).</summary>
+    [JsonPropertyName("admin_flag")] public string Admin { get; set; } = "@css/admin";
+}
+
 public class DatabaseSettings
 {
     /// <summary>
@@ -71,4 +83,5 @@ public class RetakesConfig
     [JsonPropertyName("bomb")]       public BombSettings       Bomb       { get; set; } = new();
     [JsonPropertyName("database")]   public DatabaseSettings   Database   { get; set; } = new();
     [JsonPropertyName("allocator")]  public AllocatorSettings  Allocator  { get; set; } = new();
+    [JsonPropertyName("commands")]   public CommandsSettings   Commands   { get; set; } = new();
 }

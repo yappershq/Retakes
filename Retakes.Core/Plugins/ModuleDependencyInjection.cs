@@ -84,6 +84,10 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<BuyControlModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BuyControlModule>());
 
+        // E: in-game spawn editor + map-config + admin commands
+        services.AddSingleton<SpawnEditorModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<SpawnEditorModule>());
+
         return services;
     }
 }
