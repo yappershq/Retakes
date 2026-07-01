@@ -11,14 +11,16 @@ namespace Retakes.Queue;
 
 internal sealed class QueueManager
 {
+    private static readonly byte MaxSlots = PlayerSlot.MaxPlayerCount.AsPrimitive();
+
     private readonly ILogger<QueueManager> _logger;
     private readonly InterfaceBridge       _bridge;
     private readonly ConfigModule          _config;
 
-    public HashSet<ulong> ActivePlayers          { get; } = [];
-    public HashSet<ulong> QueuePlayers           { get; } = [];
-    private HashSet<ulong> _roundTerrorists      = [];
-    private HashSet<ulong> _roundCounterTerrorists = [];
+    private readonly bool[] _activePlayers          = new bool[MaxSlots];
+    private readonly bool[] _queuePlayers            = new bool[MaxSlots];
+    private readonly bool[] _roundTerrorists         = new bool[MaxSlots];
+    private readonly bool[] _roundCounterTerrorists  = new bool[MaxSlots];
 
     private IAdminManager? _adminManager;
 
@@ -32,37 +34,117 @@ internal sealed class QueueManager
     public void SetAdminManager(IAdminManager? adminManager)
         => _adminManager = adminManager;
 
+    // ── slot-array accessors ──────────────────────────────────────────────
+
+    public IEnumerable<PlayerSlot> ActiveSlots
+    {
+        get
+        {
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_activePlayers[i])
+                    yield return new PlayerSlot(i);
+        }
+    }
+
+    public IEnumerable<PlayerSlot> QueueSlots
+    {
+        get
+        {
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_queuePlayers[i])
+                    yield return new PlayerSlot(i);
+        }
+    }
+
+    public int ActiveCount
+    {
+        get
+        {
+            var count = 0;
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_activePlayers[i])
+                    count++;
+            return count;
+        }
+    }
+
+    public int QueueCount
+    {
+        get
+        {
+            var count = 0;
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_queuePlayers[i])
+                    count++;
+            return count;
+        }
+    }
+
     // ── team sizing ────────────────────────────────────────────────────────
 
     public int GetTargetNumTerrorists()
     {
-        var total = ActivePlayers.Count;
-        return Math.Max(1, (int)MathF.Round(total * _config.Config.Teams.TerroristRatio));
+        var total = ActiveCount;
+        var shouldForceEven = _config.Config.Queue.ShouldForceEvenTeamsWhenPlayerCountIsMultipleOf10
+            && total % 10 == 0;
+        var ratio = shouldForceEven ? 0.5f : _config.Config.Teams.TerroristRatio;
+        return Math.Max(1, (int)MathF.Round(ratio * total));
     }
 
     public int GetTargetNumCounterTerrorists()
-        => Math.Max(0, ActivePlayers.Count - GetTargetNumTerrorists());
+        => Math.Max(0, ActiveCount - GetTargetNumTerrorists());
 
     // ── queue management ───────────────────────────────────────────────────
 
-    public void AddToQueue(ulong steamId64)
+    public void AddToQueue(PlayerSlot slot)
     {
-        if (!ActivePlayers.Contains(steamId64))
-            QueuePlayers.Add(steamId64);
+        if (!slot.IsValid()) return;
+        if (!_activePlayers[slot.AsPrimitive()])
+            _queuePlayers[slot.AsPrimitive()] = true;
     }
 
-    public void AddToActive(ulong steamId64)
+    public void AddToActive(PlayerSlot slot)
     {
-        QueuePlayers.Remove(steamId64);
-        ActivePlayers.Add(steamId64);
+        if (!slot.IsValid()) return;
+        _queuePlayers[slot.AsPrimitive()]  = false;
+        _activePlayers[slot.AsPrimitive()] = true;
     }
 
-    public bool IsActive(ulong steamId64) => ActivePlayers.Contains(steamId64);
+    public bool IsActive(PlayerSlot slot)
+        => slot.IsValid() && _activePlayers[slot.AsPrimitive()];
 
-    public void RemovePlayerFromQueues(ulong steamId64)
+    public bool IsQueued(PlayerSlot slot)
+        => slot.IsValid() && _queuePlayers[slot.AsPrimitive()];
+
+    public void RemovePlayerFromQueues(PlayerSlot slot)
     {
-        ActivePlayers.Remove(steamId64);
-        QueuePlayers.Remove(steamId64);
+        if (!slot.IsValid()) return;
+        _activePlayers[slot.AsPrimitive()] = false;
+        _queuePlayers[slot.AsPrimitive()]  = false;
+    }
+
+    /// <summary>Clears a slot from active/queue/round-team tracking. Used on disconnect and by PruneStale().</summary>
+    public void ClearSlot(PlayerSlot slot)
+    {
+        if (!slot.IsValid()) return;
+        var i = slot.AsPrimitive();
+        _activePlayers[i]         = false;
+        _queuePlayers[i]          = false;
+        _roundTerrorists[i]       = false;
+        _roundCounterTerrorists[i] = false;
+    }
+
+    /// <summary>Drops any tracked slot whose client is no longer connected/in-game.</summary>
+    public void PruneStale()
+    {
+        for (byte i = 0; i < MaxSlots; i++)
+        {
+            if (!_activePlayers[i] && !_queuePlayers[i]) continue;
+
+            var client = _bridge.ClientManager.GetGameClient(new PlayerSlot(i));
+            if (client is not { IsInGame: true })
+                ClearSlot(new PlayerSlot(i));
+        }
     }
 
     /// <summary>
@@ -72,28 +154,87 @@ internal sealed class QueueManager
     /// </summary>
     public void Update()
     {
-        var maxActive    = _config.Config.Game.MaxPlayers;
+        PruneStale();
+
+        var maxActive     = _config.Config.Game.MaxPlayers;
         var priorityFlags = _config.Config.Queue.PriorityFlags;
 
         // sort by priority descending so VIPs get in first
-        var sorted = QueuePlayers
-            .Select(id => (steamId: id, priority: GetQueuePriority(id, _adminManager, priorityFlags)))
+        var sorted = QueueSlots
+            .Select(slot => (slot, priority: GetQueuePriority(slot, _adminManager, priorityFlags)))
             .OrderByDescending(x => x.priority)
             .ToList();
 
-        foreach (var (steamId, _) in sorted)
+        foreach (var (slot, _) in sorted)
         {
-            if (ActivePlayers.Count >= maxActive) break;
+            if (ActiveCount >= maxActive) break;
 
-            QueuePlayers.Remove(steamId);
-            ActivePlayers.Add(steamId);
+            AddToActive(slot);
 
             // move to CT as default starting team
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is not { IsInGame: true }) continue;
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;
             controller.ChangeTeam(CStrikeTeam.CT);
+        }
+
+        HandleQueuePriority();
+    }
+
+    /// <summary>
+    /// When the active roster is full, allow high-priority queued players to bump
+    /// lower-priority (and non-immune) active players.
+    /// </summary>
+    private void HandleQueuePriority()
+    {
+        var maxActive = _config.Config.Game.MaxPlayers;
+        if (ActiveCount < maxActive) return;
+
+        var priorityFlags = _config.Config.Queue.PriorityFlags;
+        var immunityFlags = _config.Config.Queue.ImmunityFlags;
+
+        var queued = QueueSlots
+            .Select(slot => (slot, priority: GetQueuePriority(slot, _adminManager, priorityFlags)))
+            .Where(x => x.priority > int.MinValue)
+            .OrderByDescending(x => x.priority)
+            .ThenBy(x => x.slot.AsPrimitive())
+            .ToList();
+
+        foreach (var (queuedSlot, queuedPriority) in queued)
+        {
+            var candidates = ActiveSlots
+                .Select(slot => (
+                    slot,
+                    priority: GetQueuePriority(slot, _adminManager, priorityFlags),
+                    immunity: GetQueueImmunityPriority(slot, _adminManager, immunityFlags)))
+                .Where(x => x.priority < queuedPriority && x.immunity < queuedPriority)
+                .OrderBy(x => x.priority)
+                .ThenByDescending(x => x.slot.AsPrimitive())
+                .ToList();
+
+            if (candidates.Count == 0) continue;
+
+            var replaceable = candidates[0].slot;
+
+            // bump the active player to spectator + queue
+            var bumpedClient = _bridge.ClientManager.GetGameClient(replaceable);
+            if (bumpedClient is { IsInGame: true })
+            {
+                var bumpedController = bumpedClient.GetPlayerController();
+                bumpedController?.ChangeTeam(CStrikeTeam.Spectator);
+            }
+            RemovePlayerFromQueues(replaceable);
+            AddToQueue(replaceable);
+
+            // promote the queued player to active + CT
+            AddToActive(queuedSlot);
+            var promotedClient = _bridge.ClientManager.GetGameClient(queuedSlot);
+            if (promotedClient is { IsInGame: true })
+            {
+                var promotedController = promotedClient.GetPlayerController();
+                promotedController?.ChangeTeam(CStrikeTeam.CT);
+            }
         }
     }
 
@@ -101,65 +242,86 @@ internal sealed class QueueManager
 
     public void SetRoundTeams()
     {
-        _roundTerrorists.Clear();
-        _roundCounterTerrorists.Clear();
+        Array.Clear(_roundTerrorists);
+        Array.Clear(_roundCounterTerrorists);
 
-        foreach (var steamId in ActivePlayers)
+        foreach (var slot in ActiveSlots)
         {
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is not { IsInGame: true }) continue;
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;
 
             switch (controller.Team)
             {
-                case CStrikeTeam.TE: _roundTerrorists.Add(steamId);         break;
-                case CStrikeTeam.CT: _roundCounterTerrorists.Add(steamId); break;
+                case CStrikeTeam.TE: _roundTerrorists[slot.AsPrimitive()]        = true; break;
+                case CStrikeTeam.CT: _roundCounterTerrorists[slot.AsPrimitive()] = true; break;
             }
         }
     }
 
     public void ClearRoundTeams()
     {
-        _roundTerrorists.Clear();
-        _roundCounterTerrorists.Clear();
+        Array.Clear(_roundTerrorists);
+        Array.Clear(_roundCounterTerrorists);
     }
 
-    public IReadOnlySet<ulong> RoundTerrorists       => _roundTerrorists;
-    public IReadOnlySet<ulong> RoundCounterTerrorists => _roundCounterTerrorists;
+    public IReadOnlyList<PlayerSlot> RoundTerrorists
+    {
+        get
+        {
+            var list = new List<PlayerSlot>();
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_roundTerrorists[i])
+                    list.Add(new PlayerSlot(i));
+            return list;
+        }
+    }
+
+    public IReadOnlyList<PlayerSlot> RoundCounterTerrorists
+    {
+        get
+        {
+            var list = new List<PlayerSlot>();
+            for (byte i = 0; i < MaxSlots; i++)
+                if (_roundCounterTerrorists[i])
+                    list.Add(new PlayerSlot(i));
+            return list;
+        }
+    }
 
     // ── team-change handler ────────────────────────────────────────────────
 
     /// <summary>Returns true if the event should be considered handled (caller may block/suppress).</summary>
-    public bool HandlePlayerJoinedTeam(ulong steamId64, CStrikeTeam oldTeam, CStrikeTeam newTeam, bool isMidRound)
+    public bool HandlePlayerJoinedTeam(PlayerSlot slot, CStrikeTeam oldTeam, CStrikeTeam newTeam, bool isMidRound)
     {
         // spectator → any: enqueue if not already tracked
         if (oldTeam == CStrikeTeam.Spectator && newTeam != CStrikeTeam.Spectator)
         {
-            if (!ActivePlayers.Contains(steamId64) && !QueuePlayers.Contains(steamId64))
-                QueuePlayers.Add(steamId64);
+            if (!IsActive(slot) && !IsQueued(slot))
+                AddToQueue(slot);
             return false;
         }
 
         // active → spectator: remove from all queues
-        if (newTeam == CStrikeTeam.Spectator && ActivePlayers.Contains(steamId64))
+        if (newTeam == CStrikeTeam.Spectator && IsActive(slot))
         {
-            RemovePlayerFromQueues(steamId64);
+            RemovePlayerFromQueues(slot);
             return false;
         }
 
         // mid-round active player tries to switch teams — force back to spectator
-        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && ActivePlayers.Contains(steamId64))
+        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && IsActive(slot))
         {
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId64);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is { IsInGame: true })
             {
                 var controller = client.GetPlayerController();
                 if (controller is not null && controller.IsValid())
                 {
                     controller.ChangeTeam(CStrikeTeam.Spectator);
-                    RemovePlayerFromQueues(steamId64);
-                    QueuePlayers.Add(steamId64);
+                    RemovePlayerFromQueues(slot);
+                    AddToQueue(slot);
                     return true;
                 }
             }
@@ -170,15 +332,37 @@ internal sealed class QueueManager
 
     // ── priority ──────────────────────────────────────────────────────────
 
-    private static int GetQueuePriority(ulong steamId64, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
+    private int GetQueuePriority(PlayerSlot slot, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
     {
         if (adminMgr is null || flags.Count == 0)
+            return int.MinValue;
+
+        var steamId = _bridge.ClientManager.GetGameClient(slot)?.SteamId;
+        if (steamId is null)
             return int.MinValue;
 
         var best = int.MinValue;
         foreach (var flag in flags)
         {
-            if (adminMgr.GetAdmin((SteamID)steamId64)?.HasPermission(flag.Flag) == true)
+            if (adminMgr.GetAdmin(steamId.Value)?.HasPermission(flag.Flag) == true)
+                best = Math.Max(best, Math.Clamp(flag.Priority, 0, 100));
+        }
+        return best;
+    }
+
+    private int GetQueueImmunityPriority(PlayerSlot slot, IAdminManager? adminMgr, List<QueuePriorityFlagConfig> flags)
+    {
+        if (adminMgr is null || flags.Count == 0)
+            return int.MinValue;
+
+        var steamId = _bridge.ClientManager.GetGameClient(slot)?.SteamId;
+        if (steamId is null)
+            return int.MinValue;
+
+        var best = int.MinValue;
+        foreach (var flag in flags)
+        {
+            if (adminMgr.GetAdmin(steamId.Value)?.HasPermission(flag.Flag) == true)
                 best = Math.Max(best, Math.Clamp(flag.Priority, 0, 100));
         }
         return best;

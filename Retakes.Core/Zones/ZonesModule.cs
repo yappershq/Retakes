@@ -33,8 +33,9 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
         [Bombsite.B] = new List<ZoneData>(),
     };
 
-    // Keyed by SteamID64 (ulong). PlayerPostThink is per-tick — avoid allocations here.
-    private readonly Dictionary<ulong, PlayerZoneState> _playerStates = new();
+    // Slot-indexed. PlayerPostThink is per-tick — avoid allocations here.
+    private static readonly byte MaxSlots = PlayerSlot.MaxPlayerCount.AsPrimitive();
+    private readonly PlayerZoneState?[] _playerStates = new PlayerZoneState?[MaxSlots];
 
     // Stored delegates for deterministic unregister.
     private readonly Action<Bombsite>                  _onBombsiteAnnounced;
@@ -159,11 +160,11 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
             var client = controller.GetGameClient();
             if (client is not { IsInGame: true })            continue;
 
-            var steamId = (ulong)client.SteamId;
-            if (!_playerStates.TryGetValue(steamId, out var state))
+            var state = _playerStates[client.Slot.AsPrimitive()];
+            if (state is null)
             {
                 state = new PlayerZoneState();
-                _playerStates[steamId] = state;
+                _playerStates[client.Slot.AsPrimitive()] = state;
             }
 
             var team = (int)controller.Team;
@@ -182,9 +183,9 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
         var client = p.Client;
         if (client.IsFakeClient) return;
 
-        var steamId = (ulong)client.SteamId;
-        if (!_playerStates.TryGetValue(steamId, out var state)) return;
-        if (state.Zones.Count == 0)                              return;
+        var state = _playerStates[client.Slot.AsPrimitive()];
+        if (state is null)              return;
+        if (state.Zones.Count == 0)     return;
 
         var pos     = pawn.GetAbsOrigin();
         var bounced = false;
@@ -237,7 +238,7 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
     void IClientListener.OnClientDisconnected(IGameClient client, Sharp.Shared.Enums.NetworkDisconnectionReason reason)
     {
         if (client.IsFakeClient) return;
-        _playerStates.Remove((ulong)client.SteamId);
+        _playerStates[client.Slot.AsPrimitive()] = null;
     }
 
     void IClientListener.OnClientConnected(IGameClient client)   { }

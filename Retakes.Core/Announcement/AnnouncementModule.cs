@@ -30,8 +30,9 @@ internal sealed class AnnouncementModule : IModule, IClientListener
     // Optional services — resolved in OAM, may remain null.
     private IClientPreference? _clientPreference;
 
-    // In-memory mute set — used as fallback when no IClientPreference.
-    private readonly HashSet<ulong> _voicesMuted = new();
+    // In-memory mute set — used as fallback when no IClientPreference. Slot-indexed.
+    private static readonly byte MaxSlots = PlayerSlot.MaxPlayerCount.AsPrimitive();
+    private readonly bool[] _voicesMuted = new bool[MaxSlots];
 
     // Stored so we can unsubscribe cleanly in Shutdown.
     private readonly Action<Bombsite> _onBombsiteAnnounced;
@@ -129,7 +130,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
 
             // c. Voice cue (if not muted).
             if (_config.Config.MapConfig.EnableBombsiteAnnouncementVoices
-                && !IsVoiceMuted(client.SteamId))
+                && !IsVoiceMuted(client.SteamId, client.Slot))
             {
                 var announcer = Announcers[Random.Shared.Next(Announcers.Length)];
                 client.Command($"play sounds/vo/agents/{announcer}/loc_{siteLower}_01");
@@ -144,7 +145,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
         if (!client.IsInGame) return;
 
         var steamId  = client.SteamId;
-        var isMuted  = IsVoiceMuted(steamId);
+        var isMuted  = IsVoiceMuted(steamId, client.Slot);
 
         if (_clientPreference is not null)
         {
@@ -152,10 +153,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
         }
         else
         {
-            if (isMuted)
-                _voicesMuted.Remove((ulong)steamId);
-            else
-                _voicesMuted.Add((ulong)steamId);
+            _voicesMuted[client.Slot.AsPrimitive()] = !isMuted;
         }
 
         // isMuted reflects the PRE-toggle state; if it was muted we've just enabled voices.
@@ -165,7 +163,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
 
     // ── helpers ───────────────────────────────────────────────────────────
 
-    private bool IsVoiceMuted(SteamID steamId)
+    private bool IsVoiceMuted(SteamID steamId, PlayerSlot slot)
     {
         if (_clientPreference is not null)
         {
@@ -173,7 +171,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
             return cookie?.GetNumber() == 1L;
         }
 
-        return _voicesMuted.Contains((ulong)steamId);
+        return slot.IsValid() && _voicesMuted[slot.AsPrimitive()];
     }
 
     // ── IClientListener impl ──────────────────────────────────────────────
@@ -181,7 +179,7 @@ internal sealed class AnnouncementModule : IModule, IClientListener
     void IClientListener.OnClientDisconnected(IGameClient client, Sharp.Shared.Enums.NetworkDisconnectionReason reason)
     {
         if (client.IsFakeClient) return;
-        _voicesMuted.Remove((ulong)client.SteamId);
+        _voicesMuted[client.Slot.AsPrimitive()] = false;
     }
 
     void IClientListener.OnClientConnected(IGameClient client)    { }

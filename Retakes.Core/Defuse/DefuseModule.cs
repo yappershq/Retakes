@@ -32,7 +32,11 @@ internal sealed class DefuseModule : IModule, IEventListener
     public bool Init() => true;
 
     public void OnPostInit()
-        => _bridge.EventManager.InstallEventListener(this);
+    {
+        // FireGameEvent only fires for hooked events.
+        _bridge.EventManager.HookEvent("bomb_planted");
+        _bridge.EventManager.InstallEventListener(this);
+    }
 
     public void OnAllSharpModulesLoaded() { }
 

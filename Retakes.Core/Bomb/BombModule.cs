@@ -67,7 +67,11 @@ internal sealed class BombModule : IModule, IEventListener
     public bool Init() => true;
 
     public void OnPostInit()
-        => _bridge.EventManager.InstallEventListener(this);
+    {
+        // FireGameEvent only fires for hooked events; cs_round_start_beep = freeze-end timing.
+        _bridge.EventManager.HookEvent("cs_round_start_beep");
+        _bridge.EventManager.InstallEventListener(this);
+    }
 
     public void OnAllSharpModulesLoaded() { }
 

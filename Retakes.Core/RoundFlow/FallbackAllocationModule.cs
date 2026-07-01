@@ -74,10 +74,10 @@ internal sealed class FallbackAllocationModule : IModule
         }
 
         var count = 0;
-        foreach (var steamId in _queueModule.QueueManager.ActivePlayers)
+        foreach (var slot in _queueModule.QueueManager.ActiveSlots)
         {
             // Re-resolve every player fresh — never store pawn pointers across rounds.
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is not { IsInGame: true }) continue;
 
             var controller = client.GetPlayerController();

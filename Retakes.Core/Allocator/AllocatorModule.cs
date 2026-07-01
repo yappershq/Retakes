@@ -127,13 +127,14 @@ internal sealed class AllocatorModule : IModule
         var tIds  = new List<ulong>();
         var ctIds = new List<ulong>();
 
-        foreach (var steamId in _queueModule.QueueManager.ActivePlayers)
+        foreach (var slot in _queueModule.QueueManager.ActiveSlots)
         {
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is not { IsInGame: true }) continue;
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;
 
+            var steamId = (ulong)client.SteamId;
             if (controller.Team == CStrikeTeam.TE) tIds.Add(steamId);
             else if (controller.Team == CStrikeTeam.CT) ctIds.Add(steamId);
         }

@@ -9,7 +9,9 @@ using Retakes.Modules;
 using Retakes.Player;
 using Retakes.Queue;
 using Retakes.RoundFlow;
+using Retakes.Shared;
 using Retakes.Spawn;
+using Retakes.Vip;
 using Retakes.Zones;
 
 namespace Retakes.Plugins;
@@ -22,6 +24,10 @@ internal static class ModuleDependencyInjection
         // BootstrapModule kept as proof-of-life log
         services.AddSingleton<BootstrapModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<BootstrapModule>());
+
+        // Default VIP provider — "nobody is VIP" until Retakes.Vip (CHUNK 3) registers a real one.
+        // Not yet consumed by QueueManager priority logic in this chunk (deferred — see CHUNK 3).
+        services.AddSingleton<IRetakesVipProvider, DefaultVipProvider>();
 
         services.AddSingleton<ConfigModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<ConfigModule>());

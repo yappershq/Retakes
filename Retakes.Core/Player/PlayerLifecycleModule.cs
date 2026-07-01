@@ -95,7 +95,7 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         _logger.LogInformation("[Retakes] Client connected: {SteamId}", (ulong)client.SteamId);
 
         if (_config.Config.Queue.ShouldAutoJoinSpectators)
-            QueueManager.AddToQueue((ulong)client.SteamId);
+            QueueManager.AddToQueue(client.Slot);
     }
 
     void IClientListener.OnClientPutInServer(IGameClient client) { }
@@ -103,8 +103,8 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     void IClientListener.OnClientDisconnected(IGameClient client, NetworkDisconnectionReason reason)
     {
         if (client.IsFakeClient) return;
-        QueueManager.RemovePlayerFromQueues((ulong)client.SteamId);
-        GameManager.RemovePlayerScore((ulong)client.SteamId);
+        QueueManager.ClearSlot(client.Slot);
+        GameManager.ClearSlot(client.Slot);
     }
 
     // ── HandleCommandJoinTeam pre-hook ─────────────────────────────────────
@@ -125,6 +125,8 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         if (!steamId.IsValidSteamId())
             return new HookReturnValue<bool>(EHookAction.Ignored);
 
+        var slot = client.Slot;
+
         var requestedTeam = (CStrikeTeam)p.Team;
 
         // Auto-assign (0 / UnAssigned) — let the engine pick a side.
@@ -136,26 +138,26 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         // spectator → active team: enqueue if not already tracked, then let through.
         if (currentTeam == CStrikeTeam.Spectator && requestedTeam != CStrikeTeam.Spectator)
         {
-            if (!QueueManager.IsActive(steamId) && !QueueManager.QueuePlayers.Contains(steamId))
-                QueueManager.AddToQueue(steamId);
+            if (!QueueManager.IsActive(slot) && !QueueManager.IsQueued(slot))
+                QueueManager.AddToQueue(slot);
             return new HookReturnValue<bool>(EHookAction.Ignored);
         }
 
         // active → spectator: remove from all queues, then let through.
-        if (requestedTeam == CStrikeTeam.Spectator && QueueManager.IsActive(steamId))
+        if (requestedTeam == CStrikeTeam.Spectator && QueueManager.IsActive(slot))
         {
-            QueueManager.RemovePlayerFromQueues(steamId);
+            QueueManager.RemovePlayerFromQueues(slot);
             return new HookReturnValue<bool>(EHookAction.Ignored);
         }
 
         // Mid-round active player trying to switch teams — redirect to spectator + re-queue.
         var gameRules  = _bridge.ModSharp.GetGameRules();
         var isMidRound = gameRules is not null && !gameRules.IsWarmupPeriod && !gameRules.IsFreezePeriod;
-        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && QueueManager.IsActive(steamId))
+        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && QueueManager.IsActive(slot))
         {
             p.OverrideTeam(1); // redirect to spectator (1)
-            QueueManager.RemovePlayerFromQueues(steamId);
-            QueueManager.AddToQueue(steamId);
+            QueueManager.RemovePlayerFromQueues(slot);
+            QueueManager.AddToQueue(slot);
             return new HookReturnValue<bool>(EHookAction.ChangeParamReturnDefault);
         }
 
@@ -172,15 +174,16 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
 
         if (client.IsFakeClient)
         {
-            // bots always counted as active
-            QueueManager.AddToActive((ulong)controller.SteamId);
+            // bots always counted as active — slot-indexed so each bot counts individually
+            // (SteamId is 0 for every bot, which used to collapse them into one HashSet key).
+            QueueManager.AddToActive(client.Slot);
             return;
         }
 
         var steamId = (ulong)client.SteamId;
         if (!steamId.IsValidSteamId()) return;
 
-        if (!QueueManager.IsActive(steamId))
+        if (!QueueManager.IsActive(client.Slot))
         {
             // not in queue — kill and move to spectator
             pawn.AcceptInput("Kill");
@@ -205,11 +208,7 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
             {
                 var attackerClient = _bridge.ClientManager.GetGameClient((PlayerSlot)(byte)attackerSlot);
                 if (attackerClient is { IsInGame: true } && !attackerClient.IsFakeClient)
-                {
-                    var killerSteamId = (ulong)attackerClient.SteamId;
-                    if (killerSteamId.IsValidSteamId())
-                        GameManager.AddKill(killerSteamId);
-                }
+                    GameManager.AddKill(attackerClient.Slot);
             }
         }
         // No assister info available in ITakeDamageInfoParams — tracked in Phase B2 via damage service

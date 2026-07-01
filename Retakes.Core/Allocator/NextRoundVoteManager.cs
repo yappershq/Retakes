@@ -1,6 +1,7 @@
 using Retakes.Shared;
 using Retakes.Utils;
 using Sharp.Shared.Enums;
+using Sharp.Shared.Units;
 
 namespace Retakes.Allocator;
 
@@ -17,7 +18,8 @@ internal sealed class NextRoundVoteManager
     private readonly InterfaceBridge  _bridge;
     private readonly RoundTypeManager _roundTypeManager;
 
-    private readonly Dictionary<ulong, RoundType> _votes = new();
+    private static readonly byte MaxSlots = PlayerSlot.MaxPlayerCount.AsPrimitive();
+    private readonly RoundType?[] _votes = new RoundType?[MaxSlots];
     private Guid? _timerHandle;
     private int   _activePlayers; // snapshot when vote started
 
@@ -30,8 +32,10 @@ internal sealed class NextRoundVoteManager
     public bool IsActive => _timerHandle is not null;
 
     /// <summary>Cast or change a player's vote. Starts the timer on first vote.</summary>
-    public void CastVote(ulong steamId, RoundType roundType, int currentActivePlayers)
+    public void CastVote(PlayerSlot slot, RoundType roundType, int currentActivePlayers)
     {
+        if (!slot.IsValid()) return;
+
         if (!IsActive)
         {
             _activePlayers = currentActivePlayers;
@@ -44,7 +48,7 @@ internal sealed class NextRoundVoteManager
             Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Started");
         }
 
-        _votes[steamId] = roundType;
+        _votes[slot.AsPrimitive()] = roundType;
     }
 
     public void CompleteVote()
@@ -55,16 +59,18 @@ internal sealed class NextRoundVoteManager
             _timerHandle = null;
         }
 
-        if (_votes.Count == 0 || _activePlayers == 0)
+        var castVotes = _votes.Where(v => v is not null).Select(v => v!.Value).ToList();
+
+        if (castVotes.Count == 0 || _activePlayers == 0)
         {
             Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_NoVotes");
-            _votes.Clear();
+            Array.Clear(_votes);
             return;
         }
 
         // Tally
         var tally = new Dictionary<RoundType, int>();
-        foreach (var (_, vote) in _votes)
+        foreach (var vote in castVotes)
         {
             tally.TryGetValue(vote, out var count);
             tally[vote] = count + 1;
@@ -74,7 +80,7 @@ internal sealed class NextRoundVoteManager
         if ((double)highestCount / _activePlayers < EnoughVotesThreshold)
         {
             Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Failed");
-            _votes.Clear();
+            Array.Clear(_votes);
             return;
         }
 
@@ -85,7 +91,7 @@ internal sealed class NextRoundVoteManager
         _roundTypeManager.SetNextRoundTypeOverride(winner);
         var winnerName = Loc.Format(_bridge.LocalizerManager, RoundTypeKey(winner));
         Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Complete", winnerName);
-        _votes.Clear();
+        Array.Clear(_votes);
     }
 
     internal static string RoundTypeKey(RoundType roundType) => roundType switch
@@ -103,7 +109,7 @@ internal sealed class NextRoundVoteManager
             _bridge.ModSharp.StopTimer(_timerHandle.Value);
             _timerHandle = null;
         }
-        _votes.Clear();
+        Array.Clear(_votes);
         _activePlayers = 0;
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Retakes.Allocator;
 using Retakes.Player;
@@ -79,7 +80,16 @@ internal sealed class RoundFlowModule : IModule, IEventListener
     }
 
     public void OnPostInit()
-        => _bridge.EventManager.InstallEventListener(this);
+    {
+        // FireGameEvent only fires for events explicitly hooked — hook every one this module handles.
+        _bridge.EventManager.HookEvent("round_prestart");
+        _bridge.EventManager.HookEvent("round_poststart");
+        _bridge.EventManager.HookEvent("round_end");
+        _bridge.EventManager.HookEvent("bomb_planted");
+        _bridge.EventManager.HookEvent("bomb_defused");
+        _bridge.EventManager.HookEvent("player_death");
+        _bridge.EventManager.InstallEventListener(this);
+    }
 
     public void OnAllSharpModulesLoaded() { }
 
@@ -145,7 +155,7 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         _queueModule.GameManager.OnRoundPreStart(_lastRoundWinner);
         _queueModule.QueueManager.SetRoundTeams();
 
-        _logger.LogInformation("[Retakes] round_prestart: queue/balance complete. Active={Count}", _queueModule.QueueManager.ActivePlayers.Count);
+        _logger.LogInformation("[Retakes] round_prestart: queue/balance complete. Active={Count}", _queueModule.QueueManager.ActiveCount);
     }
 
     // ── round_poststart ────────────────────────────────────────────────────
@@ -169,9 +179,16 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         _queueModule.GameManager.ResetPlayerScores();
 
         // 3. Teleport active players to retakes spawns; record the planter
+        // SpawnManager.HandleRoundSpawns still takes SteamID64s (out of scope this chunk) —
+        // resolve fresh from ActiveSlots rather than storing/keying on ulong ourselves.
+        var activeSteamIds = _queueModule.QueueManager.ActiveSlots
+            .Select(slot => _bridge.ClientManager.GetGameClient(slot)?.SteamId)
+            .Where(id => id is not null)
+            .Select(id => (ulong)id!.Value);
+
         PlanterSteamId = _spawnModule.SpawnManager.HandleRoundSpawns(
             _currentBombsite,
-            _queueModule.QueueManager.ActivePlayers);
+            activeSteamIds);
 
         // 4. Publish bombsite selection to all subscribers (AnnouncementModule, ZonesModule, etc.)
         _bus.FireAnnounceBombsite(_currentBombsite);
@@ -210,9 +227,9 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         var controller = evt.Controller;
         if (controller is null || !controller.IsValid()) return;
 
-        var steamId = (ulong)controller.SteamId;
-        if (steamId.IsValidSteamId())
-            _queueModule.GameManager.AddDefuse(steamId);
+        var client = controller.GetGameClient();
+        if (client is { IsInGame: true } && !client.IsFakeClient)
+            _queueModule.GameManager.AddDefuse(client.Slot);
     }
 
     // ── player_death (assist scoring) ──────────────────────────────────────
@@ -227,9 +244,9 @@ internal sealed class RoundFlowModule : IModule, IEventListener
         // skip bots
         if (assister.IsFakeClient) return;
 
-        var steamId = (ulong)assister.SteamId;
-        if (steamId.IsValidSteamId())
-            _queueModule.GameManager.AddAssist(steamId);
+        var client = assister.GetGameClient();
+        if (client is { IsInGame: true })
+            _queueModule.GameManager.AddAssist(client.Slot);
     }
 
     // ── round termination helper (used by Phase C auto-plant fallback) ─────
@@ -249,9 +266,9 @@ internal sealed class RoundFlowModule : IModule, IEventListener
 
         // Fallback: slay everyone
         _logger.LogWarning("[Retakes] GetGameRules returned null — slaying all as TerminateRound fallback.");
-        foreach (var steamId in _queueModule.QueueManager.ActivePlayers)
+        foreach (var slot in _queueModule.QueueManager.ActiveSlots)
         {
-            var client = _bridge.ClientManager.GetGameClient((SteamID)steamId);
+            var client = _bridge.ClientManager.GetGameClient(slot);
             if (client is not { IsInGame: true }) continue;
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;

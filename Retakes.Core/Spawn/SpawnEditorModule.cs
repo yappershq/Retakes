@@ -496,13 +496,13 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         var qm = _queueModule.QueueManager;
         _logger.LogInformation(
             "[Retakes][DebugQueues] Active({A})=[{ActiveIds}] Queue({Q})=[{QueueIds}] RoundT({T})=[{TIds}] RoundCT({C})=[{CIds}]",
-            qm.ActivePlayers.Count,          string.Join(",", qm.ActivePlayers),
-            qm.QueuePlayers.Count,           string.Join(",", qm.QueuePlayers),
+            qm.ActiveCount,                  string.Join(",", qm.ActiveSlots),
+            qm.QueueCount,                   string.Join(",", qm.QueueSlots),
             qm.RoundTerrorists.Count,        string.Join(",", qm.RoundTerrorists),
             qm.RoundCounterTerrorists.Count, string.Join(",", qm.RoundCounterTerrorists));
 
         Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_QueuesDumped",
-            qm.ActivePlayers.Count, qm.QueuePlayers.Count);
+            qm.ActiveCount, qm.QueueCount);
     }
 
     // ── spawn lookup ─────────────────────────────────────────────────────────

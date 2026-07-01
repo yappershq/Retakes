@@ -29,6 +29,9 @@ public class QueueSettings
     [JsonPropertyName("immunity_flags")]              public List<QueuePriorityFlagConfig> ImmunityFlags          { get; set; } = [];
     [JsonPropertyName("should_remove_spectators")]    public bool ShouldRemoveSpectators    { get; set; } = true;
     [JsonPropertyName("should_auto_join_spectators")] public bool ShouldAutoJoinSpectators  { get; set; } = true;
+
+    [JsonPropertyName("should_force_even_teams_when_player_count_is_multiple_of_10")]
+    public bool ShouldForceEvenTeamsWhenPlayerCountIsMultipleOf10 { get; set; } = true;
 }
 
 public class TeamSettings

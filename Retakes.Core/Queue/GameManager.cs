@@ -11,14 +11,16 @@ namespace Retakes.Queue;
 
 internal sealed class GameManager
 {
+    private static readonly byte MaxSlots = PlayerSlot.MaxPlayerCount.AsPrimitive();
+
     private readonly ILogger<GameManager> _logger;
     private readonly InterfaceBridge      _bridge;
     private readonly ConfigModule         _config;
     private readonly QueueManager         _queue;
 
-    private readonly Dictionary<ulong, PlayerScore> _playerScores = [];
-    private          bool                           _scrambleNextRound;
-    private          int                            _consecutiveTerroristWins;
+    private readonly PlayerScore?[] _playerScores = new PlayerScore?[MaxSlots];
+    private          bool           _scrambleNextRound;
+    private          int            _consecutiveTerroristWins;
 
     public GameManager(ILogger<GameManager> logger, InterfaceBridge bridge, ConfigModule config, QueueManager queue)
     {
@@ -30,25 +32,29 @@ internal sealed class GameManager
 
     // ── score tracking ─────────────────────────────────────────────────────
 
-    public void AddKill(ulong steamId64)
+    public void AddKill(PlayerSlot slot)
     {
-        EnsureScore(steamId64).AddKill();
+        EnsureScore(slot).AddKill();
     }
 
-    public void AddAssist(ulong steamId64)
+    public void AddAssist(PlayerSlot slot)
     {
-        EnsureScore(steamId64).AddAssist();
+        EnsureScore(slot).AddAssist();
     }
 
-    public void AddDefuse(ulong steamId64)
+    public void AddDefuse(PlayerSlot slot)
     {
-        EnsureScore(steamId64).AddDefuse();
+        EnsureScore(slot).AddDefuse();
     }
 
-    public void ResetPlayerScores() => _playerScores.Clear();
+    public void ResetPlayerScores() => Array.Clear(_playerScores);
 
     /// <summary>Drop a disconnected player's score so it can't linger until the next round reset.</summary>
-    public void RemovePlayerScore(ulong steamId64) => _playerScores.Remove(steamId64);
+    public void ClearSlot(PlayerSlot slot)
+    {
+        if (!slot.IsValid()) return;
+        _playerScores[slot.AsPrimitive()] = null;
+    }
 
     // ── round transition ───────────────────────────────────────────────────
 
@@ -64,21 +70,31 @@ internal sealed class GameManager
             _consecutiveTerroristWins >= _config.Config.Teams.RoundsToScramble))
         {
             ScrambleTeams();
-            _scrambleNextRound          = false;
-            _consecutiveTerroristWins  = 0;
-            return;
+            _scrambleNextRound        = false;
+            _consecutiveTerroristWins = 0;
         }
-
-        if (winningTeam == CStrikeTeam.CT)
+        else if (winningTeam == CStrikeTeam.CT)
         {
             _consecutiveTerroristWins = 0;
             CounterTerroristRoundWin();
         }
         else if (winningTeam == CStrikeTeam.TE)
         {
+            // Increment BEFORE checking the scramble threshold (matches source semantics:
+            // TerroristRoundWin() increments then checks == RoundsToScramble).
             _consecutiveTerroristWins++;
             TerroristRoundWin();
+
+            if (_config.Config.Teams.IsScrambleEnabled
+                && _consecutiveTerroristWins == _config.Config.Teams.RoundsToScramble)
+            {
+                ScrambleTeams();
+                _scrambleNextRound        = false;
+                _consecutiveTerroristWins = 0;
+            }
         }
+
+        BalanceTeams();
     }
 
     public void ScrambleNextRound(ulong? adminSteamId)
@@ -90,9 +106,9 @@ internal sealed class GameManager
 
     // ── team query ─────────────────────────────────────────────────────────
 
-    public CStrikeTeam? GetCurrentTeam(ulong steamId64)
+    public CStrikeTeam? GetCurrentTeam(PlayerSlot slot)
     {
-        var client = _bridge.ClientManager.GetGameClient((SteamID)steamId64);
+        var client = _bridge.ClientManager.GetGameClient(slot);
         if (client is not { IsInGame: true }) return null;
         var controller = client.GetPlayerController();
         if (controller is null || !controller.IsValid()) return null;
@@ -105,11 +121,11 @@ internal sealed class GameManager
     {
         // Promote top-scoring CTs to Ts for next round
         var targetTerrorists = _queue.GetTargetNumTerrorists();
-        var active           = _queue.ActivePlayers.ToList();
+        var active           = _queue.ActiveSlots.ToList();
 
         var terrorists = active
-            .Where(id => GetCurrentTeam(id) == CStrikeTeam.CT)
-            .OrderByDescending(id => _playerScores.TryGetValue(id, out var s) ? s.Score : 0)
+            .Where(slot => GetCurrentTeam(slot) == CStrikeTeam.CT)
+            .OrderByDescending(slot => GetScore(slot))
             .Take(targetTerrorists)
             .ToList();
 
@@ -122,26 +138,15 @@ internal sealed class GameManager
 
     private void TerroristRoundWin()
     {
-        // T wins: swap sides (CTs become Ts)
-        var active = _queue.ActivePlayers.ToList();
-
-        var newTerrorists = active
-            .Where(id => GetCurrentTeam(id) == CStrikeTeam.CT)
-            .ToList();
-
-        var newCounterTerrorists = active
-            .Except(newTerrorists)
-            .ToList();
-
-        SetTeams(newTerrorists, newCounterTerrorists);
-
+        // T win: source semantics — no team reassignment here, just the streak announcement.
+        // (BalanceTeams(), called unconditionally afterward, handles side-count correction.)
         Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Teams_CtSwapped",
             _consecutiveTerroristWins, _config.Config.Teams.RoundsToScramble);
     }
 
     private void ScrambleTeams()
     {
-        var active = _queue.ActivePlayers.OrderBy(_ => Random.Shared.Next()).ToList();
+        var active  = _queue.ActiveSlots.OrderBy(_ => Random.Shared.Next()).ToList();
         var targetT = _queue.GetTargetNumTerrorists();
 
         var terrorists        = active.Take(targetT).ToList();
@@ -151,27 +156,54 @@ internal sealed class GameManager
         Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Teams_Scrambled");
     }
 
-    private void SetTeams(IReadOnlyList<ulong> terrorists, IReadOnlyList<ulong> counterTerrorists)
+    /// <summary>
+    /// Adjust the live T count toward GetTargetNumTerrorists() by switching CTs to T.
+    /// Queried live (controller.Team) rather than from the round-team snapshot, since
+    /// RoundFlowModule clears/repopulates that snapshot around this call.
+    /// </summary>
+    private void BalanceTeams()
     {
-        foreach (var id in terrorists)
-            SwitchTeamFor(id, CStrikeTeam.TE);
-        foreach (var id in counterTerrorists)
-            SwitchTeamFor(id, CStrikeTeam.CT);
+        var activeSlots = _queue.ActiveSlots.ToList();
+
+        var currentT = activeSlots.Count(slot => GetCurrentTeam(slot) == CStrikeTeam.TE);
+        var numTerroristsNeeded = _queue.GetTargetNumTerrorists() - currentT;
+        if (numTerroristsNeeded <= 0) return;
+
+        var cts = activeSlots.Where(slot => GetCurrentTeam(slot) == CStrikeTeam.CT).ToList();
+
+        // Prefer scoring CTs first, then backfill from the shuffled remainder.
+        var scored    = cts.Where(slot => GetScore(slot) > 0).OrderByDescending(GetScore).ToList();
+        var remaining = cts.Except(scored).OrderBy(_ => Random.Shared.Next()).ToList();
+
+        var chosen = scored.Concat(remaining).Take(numTerroristsNeeded).ToList();
+
+        foreach (var slot in chosen)
+            SwitchTeamFor(slot, CStrikeTeam.TE);
     }
 
-    private void SwitchTeamFor(ulong steamId64, CStrikeTeam team)
+    private void SetTeams(IReadOnlyList<PlayerSlot> terrorists, IReadOnlyList<PlayerSlot> counterTerrorists)
     {
-        var client = _bridge.ClientManager.GetGameClient((SteamID)steamId64);
+        foreach (var slot in terrorists)
+            SwitchTeamFor(slot, CStrikeTeam.TE);
+        foreach (var slot in counterTerrorists)
+            SwitchTeamFor(slot, CStrikeTeam.CT);
+    }
+
+    private void SwitchTeamFor(PlayerSlot slot, CStrikeTeam team)
+    {
+        var client = _bridge.ClientManager.GetGameClient(slot);
         if (client is not { IsInGame: true }) return;
         var controller = client.GetPlayerController();
         if (controller is null || !controller.IsValid()) return;
         controller.SwitchTeam(team);
     }
 
-    private PlayerScore EnsureScore(ulong steamId64)
+    private int GetScore(PlayerSlot slot)
+        => slot.IsValid() ? _playerScores[slot.AsPrimitive()]?.Score ?? 0 : 0;
+
+    private PlayerScore EnsureScore(PlayerSlot slot)
     {
-        if (!_playerScores.TryGetValue(steamId64, out var score))
-            _playerScores[steamId64] = score = new PlayerScore();
-        return score;
+        var i = slot.AsPrimitive();
+        return _playerScores[i] ??= new PlayerScore();
     }
 }

@@ -376,27 +376,27 @@ internal sealed class AllocatorCommandsModule : IModule
     private Menu BuildVoteMenu(IGameClient client)
     {
         var lm            = _bridge.LocalizerManager;
-        var activePlayers = _queueModule.QueueManager.ActivePlayers.Count;
+        var activePlayers = _queueModule.QueueManager.ActiveCount;
 
         return Menu.Create()
             .Title(Loc.Str(lm, client, "Retakes_Menu_VoteTitle"))
             .Item(Loc.Str(lm, client, "Retakes_RoundType_Pistol"), ctrl =>
             {
-                _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.Pistol, activePlayers);
+                _voteManager.CastVote(ctrl.Client.Slot, RoundType.Pistol, activePlayers);
                 Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
                     Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_Pistol"));
                 ctrl.Exit();
             })
             .Item(Loc.Str(lm, client, "Retakes_RoundType_HalfBuy"), ctrl =>
             {
-                _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.HalfBuy, activePlayers);
+                _voteManager.CastVote(ctrl.Client.Slot, RoundType.HalfBuy, activePlayers);
                 Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
                     Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_HalfBuy"));
                 ctrl.Exit();
             })
             .Item(Loc.Str(lm, client, "Retakes_RoundType_FullBuy"), ctrl =>
             {
-                _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.FullBuy, activePlayers);
+                _voteManager.CastVote(ctrl.Client.Slot, RoundType.FullBuy, activePlayers);
                 Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
                     Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_FullBuy"));
                 ctrl.Exit();
