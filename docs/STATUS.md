@@ -1,6 +1,6 @@
 # Retakes port — STATUS
 
-Overnight migration of cs2-retakes (+allocator/zones/defuse) to ModSharp. Design: docs/PORT_PLAN.md. Sources cloned at /home/claude/retakes-research/. Repo: /home/claude/Retakes (local git; public GitHub repo to be created under yappershq).
+Overnight migration of cs2-retakes (+allocator/zones/defuse) to ModSharp. Design: docs/PORT_PLAN.md. Sources cloned at /home/claude/retakes-research/. Repo: /home/claude/Retakes → PUBLISHED public: https://github.com/yappershq/Retakes (branch main).
 
 Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`. Commit each green phase.
 
@@ -12,6 +12,7 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
   - CAVEAT (live-test): planted_c4 timer countdown init unproven headless; m_flC4Blow/m_flTimerLength settable; TerminateRound timer fallback if needed.
 - [x] **D. Allocator** — round types, weapon/nade/armor alloc, SqlSugar prefs, menus, voting, mid-round buy-block (PlayerCanAcquire hard-block). GREEN.
 - [x] **E. Spawn editor.** SpawnEditorModule: !showspawns/!edit, !add, !remove, !nearest, !hidespawns/!done, !mapconfig(s), !forcebombsite(stop), !scramble, !debugqueues. GREEN. Viz = team-colored prop_dynamic (RenderColor + best-effort glow) + point_worldtext label (IWorldText typed API); warmup-freeze via ServerCommand(mp_warmup_*); in-bomb-zone auto-planter via m_bInBombZone netvar. Instance-scoped entity cleanup (no static).
+- [x] **DONE — published https://github.com/yappershq/Retakes**
 - [x] **F. Review** — audit (1 BLOCKER+5 HIGH found & FIXED: entity-index viz, pref cache, deleted dead DB plugin, atomic upsert, map-change reloads, null guards). Assets/README/11 map configs shipped. GREEN.
 
 ## Notes / decisions
