@@ -59,6 +59,7 @@
   "Retakes_RoundType_HalfBuy":  { "en-US": "Half-Buy" },
   "Retakes_RoundType_FullBuy":  { "en-US": "Full-Buy" },
 
+  "Retakes_Menu_WeaponPrefs":        { "en-US": "Weapon Preferences" },
   "Retakes_Menu_SniperPref":         { "en-US": "Sniper Preference" },
   "Retakes_Menu_RequestAwp":         { "en-US": "Request AWP / Sniper (queue-based)" },
   "Retakes_Menu_NoPreferredSniper":  { "en-US": "No preferred sniper" },

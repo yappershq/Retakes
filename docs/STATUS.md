@@ -1,5 +1,7 @@
 # Retakes port — STATUS
 
+**House-convention corrections (2026-07-01, post-review by prefix):** css_ prefix stripped; ILocalizerManager + .assets/locales/retakes.json wired (was hardcoded English); gun menu rebuilt as cached nested SubMenu tree (was linear .Next()); jointeam now uses HandleCommandJoinTeam.InstallHookPre (was player_team event). All green.
+
 Overnight migration of cs2-retakes (+allocator/zones/defuse) to ModSharp. Design: docs/PORT_PLAN.md. Sources cloned at /home/claude/retakes-research/. Repo: /home/claude/Retakes → PUBLISHED public: https://github.com/yappershq/Retakes (branch main).
 
 Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`. Commit each green phase.

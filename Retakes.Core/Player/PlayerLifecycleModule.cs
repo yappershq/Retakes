@@ -9,6 +9,7 @@ using Sharp.Shared.GameEvents;
 using Sharp.Shared.HookParams;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Objects;
+using Sharp.Shared.Types;
 using Sharp.Shared.Units;
 
 namespace Retakes.Player;
@@ -24,9 +25,12 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     private QueueManager QueueManager => _queueModule.QueueManager;
     private GameManager  GameManager  => _queueModule.GameManager;
 
-    // forward callbacks — stored as fields so we can unregister them
+    // ── forward / hook callbacks (cached as fields so they can be unregistered) ──
     private readonly Action<IPlayerSpawnForwardParams>  _onSpawnPost;
     private readonly Action<IPlayerKilledForwardParams> _onKilledPost;
+
+    // HandleCommandJoinTeam pre-hook — typed delegate field required by HookManager.
+    private Func<IHandleCommandJoinTeamHookParams, HookReturnValue<bool>, HookReturnValue<bool>>? _joinTeamHook;
 
     // ── IEventListener ─────────────────────────────────────────────────────
     int IEventListener.ListenerVersion  => IEventListener.ApiVersion;
@@ -62,6 +66,12 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         _bridge.ClientManager.InstallClientListener(this);
         _bridge.HookManager.PlayerSpawnPost.InstallForward(_onSpawnPost);
         _bridge.HookManager.PlayerKilledPost.InstallForward(_onKilledPost);
+
+        // HandleCommandJoinTeam pre-hook: gate team joins BEFORE the engine processes them.
+        _joinTeamHook = OnHandleCommandJoinTeam;
+        _bridge.HookManager.HandleCommandJoinTeam.InstallHookPre(_joinTeamHook);
+
+        // player_team event: kept only to suppress team-change UI noise (Silent = true).
         _bridge.EventManager.HookEvent("player_team");
         _bridge.EventManager.InstallEventListener(this);
     }
@@ -71,6 +81,10 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     public void Shutdown()
     {
         _bridge.EventManager.RemoveEventListener(this);
+
+        if (_joinTeamHook is not null)
+            _bridge.HookManager.HandleCommandJoinTeam.RemoveHookPre(_joinTeamHook);
+
         _bridge.HookManager.PlayerKilledPost.RemoveForward(_onKilledPost);
         _bridge.HookManager.PlayerSpawnPost.RemoveForward(_onSpawnPost);
         _bridge.ClientManager.RemoveClientListener(this);
@@ -100,6 +114,61 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         if (client.IsFakeClient) return;
         _db.EvictUser((ulong)client.SteamId);
         QueueManager.RemovePlayerFromQueues((ulong)client.SteamId);
+    }
+
+    // ── HandleCommandJoinTeam pre-hook ─────────────────────────────────────
+    //
+    // Fires BEFORE the engine processes a jointeam command.  We evaluate queue
+    // state here instead of reacting to the player_team event so we can block
+    // or redirect the request cleanly without a post-hoc ChangeTeam call.
+
+    private HookReturnValue<bool> OnHandleCommandJoinTeam(
+        IHandleCommandJoinTeamHookParams p,
+        HookReturnValue<bool> prev)
+    {
+        var client = p.Client;
+        if (client is null || !client.IsInGame || client.IsFakeClient)
+            return new HookReturnValue<bool>(EHookAction.Ignored);
+
+        var steamId = (ulong)client.SteamId;
+        if (!steamId.IsValidSteamId())
+            return new HookReturnValue<bool>(EHookAction.Ignored);
+
+        var requestedTeam = (CStrikeTeam)p.Team;
+
+        // Auto-assign (0 / UnAssigned) — let the engine pick a side.
+        if (requestedTeam == CStrikeTeam.UnAssigned)
+            return new HookReturnValue<bool>(EHookAction.Ignored);
+
+        var currentTeam = client.GetPlayerController()?.Team ?? CStrikeTeam.Spectator;
+
+        // spectator → active team: enqueue if not already tracked, then let through.
+        if (currentTeam == CStrikeTeam.Spectator && requestedTeam != CStrikeTeam.Spectator)
+        {
+            if (!QueueManager.IsActive(steamId) && !QueueManager.QueuePlayers.Contains(steamId))
+                QueueManager.AddToQueue(steamId);
+            return new HookReturnValue<bool>(EHookAction.Ignored);
+        }
+
+        // active → spectator: remove from all queues, then let through.
+        if (requestedTeam == CStrikeTeam.Spectator && QueueManager.IsActive(steamId))
+        {
+            QueueManager.RemovePlayerFromQueues(steamId);
+            return new HookReturnValue<bool>(EHookAction.Ignored);
+        }
+
+        // Mid-round active player trying to switch teams — redirect to spectator + re-queue.
+        var gameRules  = _bridge.ModSharp.GetGameRules();
+        var isMidRound = gameRules is not null && !gameRules.IsWarmupPeriod && !gameRules.IsFreezePeriod;
+        if (isMidRound && _config.Config.Teams.ShouldPreventTeamChangesMidRound && QueueManager.IsActive(steamId))
+        {
+            p.OverrideTeam(1); // redirect to spectator (1)
+            QueueManager.RemovePlayerFromQueues(steamId);
+            QueueManager.AddToQueue(steamId);
+            return new HookReturnValue<bool>(EHookAction.ChangeParamReturnDefault);
+        }
+
+        return new HookReturnValue<bool>(EHookAction.Ignored);
     }
 
     // ── spawn forward ──────────────────────────────────────────────────────
@@ -156,35 +225,14 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     }
 
     // ── IEventListener impl ────────────────────────────────────────────────
+    // Kept only to suppress the team-change chat notification (Silent = true).
+    // All queue gating has moved to the HandleCommandJoinTeam pre-hook above.
 
     bool IEventListener.HookFireEvent(IGameEvent @event, ref bool serverOnly)
     {
-        if (@event is not IEventPlayerTeam evt) return true;
-
-        // always suppress team-change UI noise
-        evt.Silent = true;
-
-        // let disconnect events through unmodified
-        if (evt.Disconnect) return true;
-
-        var controller = evt.Controller;
-        if (controller is null || !controller.IsValid()) return true;
-
-        // bots — don't queue-manage them here
-        if (evt.Bot) return true;
-
-        var client = controller.GetGameClient();
-        if (client is null) return true;
-
-        var steamId    = (ulong)client.SteamId;
-        if (!steamId.IsValidSteamId()) return true;
-
-        var gameRules  = _bridge.ModSharp.GetGameRules();
-        var isMidRound = gameRules is not null && !gameRules.IsWarmupPeriod && !gameRules.IsFreezePeriod;
-
-        QueueManager.HandlePlayerJoinedTeam(steamId, evt.OldTeam, evt.NewTeam, isMidRound);
-
-        return true; // never block the event itself
+        if (@event is IEventPlayerTeam evt)
+            evt.Silent = true;
+        return true;
     }
 
     void IEventListener.FireGameEvent(IGameEvent @event) { }

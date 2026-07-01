@@ -6,6 +6,7 @@ using Retakes.Queue;
 using Retakes.Shared;
 using Retakes.Utils;
 using Sharp.Modules.CommandCenter.Shared;
+using Sharp.Modules.LocalizerManager.Shared;
 using Sharp.Modules.MenuManager.Shared;
 using Sharp.Shared.Enums;
 using Sharp.Shared.Objects;
@@ -30,6 +31,9 @@ internal sealed class AllocatorCommandsModule : IModule
     private readonly NextRoundVoteManager             _voteManager;
 
     private IMenuManager? _menuManager;
+
+    // Cached nested gun menu — built once in OnAllSharpModulesLoaded.
+    private Menu? _gunMenu;
 
     private readonly Action _onAllocate;
 
@@ -66,6 +70,10 @@ internal sealed class AllocatorCommandsModule : IModule
 
         if (_menuManager is null)
             _logger.LogWarning("[Retakes] AllocatorCommandsModule: IMenuManager not available — gun menu disabled.");
+
+        // Build the cached gun menu tree regardless — the tree uses factory lambdas
+        // so per-player localization is resolved at display time, not build time.
+        BuildAndCacheGunMenu();
 
         var cc = _bridge.SharpModuleManager
             .GetOptionalSharpModuleInterface<ICommandCenter>(ICommandCenter.Identity)?.Instance;
@@ -108,13 +116,13 @@ internal sealed class AllocatorCommandsModule : IModule
     {
         if (!client.IsInGame) return;
 
-        if (_menuManager is null)
+        if (_menuManager is null || _gunMenu is null)
         {
             Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_MenuUnavailable");
             return;
         }
 
-        _menuManager.DisplayMenu(client, BuildGunMenuChain(client));
+        _menuManager.DisplayMenu(client, _gunMenu);
     }
 
     // ── !gun / !removegun ──────────────────────────────────────────────────
@@ -284,29 +292,55 @@ internal sealed class AllocatorCommandsModule : IModule
         _menuManager.DisplayMenu(client, BuildVoteMenu(client));
     }
 
-    // ── Gun menu chain (built bottom-up, localized to the requesting client) ─
+    // ── Gun menu — nested cached SubMenu tree ──────────────────────────────
+    //
+    // Built ONCE in OnAllSharpModulesLoaded.  Every node uses factory lambdas
+    // so per-player localization is evaluated lazily at display time.
+    // Selecting a weapon saves the pref and returns to the parent (GoBack) —
+    // the MenuManager never closes the session on a normal selection.
 
-    private Menu BuildGunMenuChain(IGameClient client)
+    private void BuildAndCacheGunMenu()
     {
         var cfg = _config.Config.Allocator;
+        var lm  = _bridge.LocalizerManager;
 
-        var awpMenu      = BuildAwpMenu(client);
-        var ctHalfMenu   = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtHalf",      CStrikeTeam.CT, WeaponAllocationType.HalfBuyPrimary, cfg, awpMenu);
-        var tHalfMenu    = BuildWeaponPageMenu(client, "Retakes_Menu_Page_THalf",       CStrikeTeam.TE, WeaponAllocationType.HalfBuyPrimary, cfg, ctHalfMenu);
-        var ctPistolMenu = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtPistol",    CStrikeTeam.CT, WeaponAllocationType.PistolRound,    cfg, tHalfMenu);
-        var tPistolMenu  = BuildWeaponPageMenu(client, "Retakes_Menu_Page_TPistol",     CStrikeTeam.TE, WeaponAllocationType.PistolRound,    cfg, ctPistolMenu);
-        var ctSecMenu    = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtSecondary", CStrikeTeam.CT, WeaponAllocationType.Secondary,      cfg, tPistolMenu);
-        var tSecMenu     = BuildWeaponPageMenu(client, "Retakes_Menu_Page_TSecondary",  CStrikeTeam.TE, WeaponAllocationType.Secondary,      cfg, ctSecMenu);
-        var ctPrimMenu   = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtPrimary",   CStrikeTeam.CT, WeaponAllocationType.FullBuyPrimary, cfg, tSecMenu);
-        return              BuildWeaponPageMenu(client, "Retakes_Menu_Page_TPrimary",    CStrikeTeam.TE, WeaponAllocationType.FullBuyPrimary, cfg, ctPrimMenu);
+        var tPrimaryMenu  = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_TPrimary",    CStrikeTeam.TE, WeaponAllocationType.FullBuyPrimary,  cfg);
+        var ctPrimaryMenu = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_CtPrimary",   CStrikeTeam.CT, WeaponAllocationType.FullBuyPrimary,  cfg);
+        var tSecMenu      = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_TSecondary",  CStrikeTeam.TE, WeaponAllocationType.Secondary,       cfg);
+        var ctSecMenu     = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_CtSecondary", CStrikeTeam.CT, WeaponAllocationType.Secondary,       cfg);
+        var tPistolMenu   = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_TPistol",     CStrikeTeam.TE, WeaponAllocationType.PistolRound,     cfg);
+        var ctPistolMenu  = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_CtPistol",    CStrikeTeam.CT, WeaponAllocationType.PistolRound,     cfg);
+        var tHalfMenu     = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_THalf",       CStrikeTeam.TE, WeaponAllocationType.HalfBuyPrimary,  cfg);
+        var ctHalfMenu    = BuildWeaponSubMenu(lm, "Retakes_Menu_Page_CtHalf",      CStrikeTeam.CT, WeaponAllocationType.HalfBuyPrimary,  cfg);
+        var awpSubMenu    = BuildAwpSubMenu(lm);
+
+        _gunMenu = Menu.Create()
+            .Title(client => Loc.Str(lm, client, "Retakes_Menu_WeaponPrefs"))
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_TPrimary"),    tPrimaryMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_CtPrimary"),   ctPrimaryMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_TSecondary"),  tSecMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_CtSecondary"), ctSecMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_TPistol"),     tPistolMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_CtPistol"),    ctPistolMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_THalf"),       tHalfMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_Page_CtHalf"),      ctHalfMenu)
+            .SubMenu(client => Loc.Str(lm, client, "Retakes_Menu_SniperPref"),       awpSubMenu)
+            .ExitItem()
+            .Build();
     }
 
-    private Menu BuildWeaponPageMenu(
-        IGameClient client, string titleKey, CStrikeTeam team, WeaponAllocationType allocType, AllocatorSettings cfg, Menu nextMenu)
+    /// <summary>
+    /// Builds one weapon-slot submenu.  Weapon items save the preference and return to the
+    /// parent via <see cref="IMenuController.GoBack"/>; BackItem acts as a no-save Skip.
+    /// </summary>
+    private Menu BuildWeaponSubMenu(
+        ILocalizerManager? lm, string titleKey,
+        CStrikeTeam team, WeaponAllocationType allocType, AllocatorSettings cfg)
     {
-        var lm      = _bridge.LocalizerManager;
         var weapons = WeaponHelpers.GetPossibleWeaponsForAllocationType(allocType, team, cfg);
-        var builder = Menu.Create().Title(Loc.Str(lm, client, titleKey));
+        var builder = Menu.Create()
+            .Title(client => Loc.Str(lm, client, titleKey));
+
         foreach (var weapon in weapons)
         {
             var capturedWeapon = weapon;
@@ -315,31 +349,30 @@ internal sealed class AllocatorCommandsModule : IModule
             builder.Item(DisplayName(capturedWeapon), ctrl =>
             {
                 SavePref(ctrl.Client, capturedTeam, capturedAlloc, capturedWeapon);
-                ctrl.Next(nextMenu);
+                ctrl.GoBack();
             });
         }
-        builder.Item(Loc.Str(lm, client, "Retakes_Menu_Skip"), ctrl => ctrl.Next(nextMenu));
+
+        // BackItem doubles as "Skip / no change" for this slot.
+        builder.BackItem(client => Loc.Str(lm, client, "Retakes_Menu_Skip"));
         return builder.Build();
     }
 
-    private Menu BuildAwpMenu(IGameClient client)
+    private Menu BuildAwpSubMenu(ILocalizerManager? lm)
     {
-        var lm = _bridge.LocalizerManager;
         return Menu.Create()
-            .Title(Loc.Str(lm, client, "Retakes_Menu_SniperPref"))
-            .Item(Loc.Str(lm, client, "Retakes_Menu_RequestAwp"), ctrl =>
+            .Title(client => Loc.Str(lm, client, "Retakes_Menu_SniperPref"))
+            .Item(client => Loc.Str(lm, client, "Retakes_Menu_RequestAwp"), ctrl =>
             {
                 SavePref(ctrl.Client, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
-                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_PrefsSaved");
-                ctrl.Exit();
+                ctrl.GoBack();
             })
-            .Item(Loc.Str(lm, client, "Retakes_Menu_NoPreferredSniper"), ctrl =>
+            .Item(client => Loc.Str(lm, client, "Retakes_Menu_NoPreferredSniper"), ctrl =>
             {
                 ClearPref(ctrl.Client, CStrikeTeam.TE, WeaponAllocationType.Preferred);
-                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_PrefsSaved");
-                ctrl.Exit();
+                ctrl.GoBack();
             })
-            .ExitItem(Loc.Str(lm, client, "Retakes_Menu_SkipDone"))
+            .BackItem(client => Loc.Str(lm, client, "Retakes_Menu_SkipDone"))
             .Build();
     }
 
