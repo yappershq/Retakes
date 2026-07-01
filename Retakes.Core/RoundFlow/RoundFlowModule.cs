@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Retakes.Allocator;
+using Retakes.Player;
 using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Queue;
@@ -260,7 +261,3 @@ internal sealed class RoundFlowModule : IModule, IEventListener
     }
 }
 
-file static class SteamIdGuard
-{
-    internal static bool IsValidSteamId(this ulong id) => id > 76561197960265728UL;
-}

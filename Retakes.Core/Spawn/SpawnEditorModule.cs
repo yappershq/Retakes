@@ -53,8 +53,9 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
     private IAdminManager? _adminManager;
 
     // ── editor session state (instance-scoped, never static) ─────────────────
-    private Bombsite?             _editBombsite;   // null = not editing
-    private readonly List<IBaseEntity> _vizEntities = [];
+    private Bombsite?              _editBombsite;   // null = not editing
+    // ponytail: store indices not entity references — raw IBaseEntity pointers dangle after bulk-kill
+    private readonly List<EntityIndex> _vizEntities = [];
 
     int IGameListener.ListenerVersion  => IGameListener.ApiVersion;
     int IGameListener.ListenerPriority => 0;
@@ -143,7 +144,10 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         _bridge.ModSharp.RemoveGameListener(this);
     }
 
-    // ── IGameListener: precache the viz models at the correct phase ──────────
+    // ── IGameListener ────────────────────────────────────────────────────────
+
+    /// <summary>On map change entities are already gone; just clear the index list.</summary>
+    void IGameListener.OnServerActivate() => _vizEntities.Clear();
 
     void IGameListener.OnResourcePrecache()
     {
@@ -561,7 +565,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
                 }
 
                 prop.Teleport(spawn.Position, spawn.Angles, new Vector());
-                _vizEntities.Add(prop);
+                _vizEntities.Add(prop.Index);
             }
             catch (Exception ex)
             {
@@ -594,7 +598,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
             text.Teleport(textPos, textAngle, new Vector());
             text.DispatchSpawn();
 
-            _vizEntities.Add(text);
+            _vizEntities.Add(text.Index);
         }
         catch (Exception ex)
         {
@@ -605,9 +609,10 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
     private void ClearViz()
     {
-        foreach (var ent in _vizEntities)
+        foreach (var idx in _vizEntities)
         {
-            if (ent.IsValidEntity)
+            var ent = _bridge.EntityManager.FindEntityByIndex(idx);
+            if (ent is { IsValidEntity: true })
                 ent.Kill();
         }
         _vizEntities.Clear();

@@ -7,6 +7,7 @@ using Sharp.Shared.GameEntities;
 using Sharp.Shared.GameEvents;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Objects;
+using Sharp.Shared.Units;
 
 namespace Retakes.Breaker;
 
@@ -97,14 +98,24 @@ internal sealed class BreakerModule : IModule, IEventListener
         if (_entityActions.Count == 0) return;
 
         var broken = 0;
+        // ponytail: collect indices first, then act — avoids stale cursor when Kill frees the entity
+        var indices = new List<EntityIndex>();
         foreach (var (classname, action) in _entityActions)
         {
+            indices.Clear();
             IBaseEntity? ent = null;
             while ((ent = _bridge.EntityManager.FindEntityByClassname(ent, classname)) is not null)
             {
                 if (ent.IsValid())
+                    indices.Add(ent.Index);
+            }
+
+            foreach (var idx in indices)
+            {
+                var e = _bridge.EntityManager.FindEntityByIndex(idx);
+                if (e is { IsValidEntity: true })
                 {
-                    ent.AcceptInput(action);
+                    e.AcceptInput(action);
                     broken++;
                 }
             }

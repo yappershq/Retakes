@@ -12,7 +12,7 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
   - CAVEAT (live-test): planted_c4 timer countdown init unproven headless; m_flC4Blow/m_flTimerLength settable; TerminateRound timer fallback if needed.
 - [x] **D. Allocator** — round types, weapon/nade/armor alloc, SqlSugar prefs, menus, voting, mid-round buy-block (PlayerCanAcquire hard-block). GREEN.
 - [x] **E. Spawn editor.** SpawnEditorModule: !showspawns/!edit, !add, !remove, !nearest, !hidespawns/!done, !mapconfig(s), !forcebombsite(stop), !scramble, !debugqueues. GREEN. Viz = team-colored prop_dynamic (RenderColor + best-effort glow) + point_worldtext label (IWorldText typed API); warmup-freeze via ServerCommand(mp_warmup_*); in-bomb-zone auto-planter via m_bInBombZone netvar. Instance-scoped entity cleanup (no static).
-- [~] **F. Review** — anti-pattern pass, README, configs.example, lang, gamedata; create+push public GitHub repo.
+- [x] **F. Review** — audit (1 BLOCKER+5 HIGH found & FIXED: entity-index viz, pref cache, deleted dead DB plugin, atomic upsert, map-change reloads, null guards). Assets/README/11 map configs shipped. GREEN.
 
 ## Notes / decisions
 - Entry ctor + IModule (Init/OnPostInit/OnAllSharpModulesLoaded/Shutdown) + DI fan-out mirror mmosystem/MonsterMod.

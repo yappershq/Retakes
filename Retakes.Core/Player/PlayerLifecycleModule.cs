@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
+using Retakes.Database;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Sharp.Shared.Enums;
@@ -18,6 +19,7 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     private readonly InterfaceBridge                _bridge;
     private readonly ConfigModule                   _config;
     private readonly QueueModule                    _queueModule;
+    private readonly RetakesDatabase                _db;
 
     private QueueManager QueueManager => _queueModule.QueueManager;
     private GameManager  GameManager  => _queueModule.GameManager;
@@ -38,12 +40,14 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
         ILogger<PlayerLifecycleModule> logger,
         InterfaceBridge                bridge,
         ConfigModule                   config,
-        QueueModule                    queueModule)
+        QueueModule                    queueModule,
+        RetakesDatabase                db)
     {
         _logger      = logger;
         _bridge      = bridge;
         _config      = config;
         _queueModule = queueModule;
+        _db          = db;
 
         _onSpawnPost  = OnSpawnPost;
         _onKilledPost = OnKilledPost;
@@ -84,13 +88,19 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
             QueueManager.AddToQueue((ulong)client.SteamId);
     }
 
+    void IClientListener.OnClientPutInServer(IGameClient client)
+    {
+        if (client.IsFakeClient) return;
+        // Prefetch prefs async so game-thread allocations always read from cache.
+        _db.PrefetchUserAsync((ulong)client.SteamId);
+    }
+
     void IClientListener.OnClientDisconnected(IGameClient client, NetworkDisconnectionReason reason)
     {
         if (client.IsFakeClient) return;
+        _db.EvictUser((ulong)client.SteamId);
         QueueManager.RemovePlayerFromQueues((ulong)client.SteamId);
     }
-
-    void IClientListener.OnClientPutInServer(IGameClient client) { }
 
     // ── spawn forward ──────────────────────────────────────────────────────
 
@@ -178,10 +188,4 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
     }
 
     void IEventListener.FireGameEvent(IGameEvent @event) { }
-}
-
-file static class SteamIdExtensions
-{
-    internal static bool IsValidSteamId(this ulong steamId)
-        => steamId > 76561197960265728UL;
 }

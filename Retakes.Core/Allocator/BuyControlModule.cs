@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
 using Retakes.Database;
-using Retakes.Database.Models;
 using Retakes.Plugins;
 using Retakes.Shared;
 using Sharp.Shared.Enums;
@@ -215,11 +214,10 @@ internal sealed class BuyControlModule : IModule, IEventListener
 
     private void SavePreference(ulong steamId, CStrikeTeam team, WeaponAllocationType allocType, CsItem weapon)
     {
-        // Synchronous single-row read (same pattern as AllocatorCommandsModule).
-        var setting = _db.GetUserSettings(steamId) ?? new UserSetting { UserId = (long)steamId };
+        var setting = _db.GetCachedUserSettings(steamId);
         setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
             setting.WeaponPreferencesJson, team, allocType, weapon);
-        _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
 
         _logger.LogDebug("[Retakes][BuyControl] Saved pref: {SteamId} {Team} {Type} = {Weapon}",
             steamId, team, allocType, weapon);

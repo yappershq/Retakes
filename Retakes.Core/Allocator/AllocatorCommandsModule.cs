@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
 using Retakes.Database;
-using Retakes.Database.Models;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
@@ -200,21 +199,21 @@ internal sealed class AllocatorCommandsModule : IModule
         }
 
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetUserSettings(steamId) ?? new UserSetting { UserId = (long)steamId };
+        var setting = _db.GetCachedUserSettings(steamId);
 
         string message;
         if (remove)
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, team, allocType.Value, null);
-            _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
             message = $"[Retakes] Removed {weapon.Value.GetName()} preference for {allocType.Value} ({team}).";
         }
         else
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, team, allocType.Value, weapon.Value);
-            _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
             message = $"[Retakes] Set {weapon.Value.GetName()} as your {allocType.Value} preference for {team}.";
 
             // Immediate re-give if in-round, team matches, and not a preferred (AWP-queue) weapon
@@ -230,7 +229,7 @@ internal sealed class AllocatorCommandsModule : IModule
         if (!_config.Config.Allocator.AllowAllocationAfterFreezeTime) return;
 
         var gameRules = _bridge.ModSharp.GetGameRules();
-        if (gameRules.IsFreezePeriod || gameRules.IsWarmupPeriod) return;
+        if (gameRules is null || gameRules.IsFreezePeriod || gameRules.IsWarmupPeriod) return;
 
         var currentRoundType = _roundTypeManager.CurrentRoundType;
         if (currentRoundType is null) return;
@@ -252,7 +251,7 @@ internal sealed class AllocatorCommandsModule : IModule
         if (!client.IsInGame) return;
 
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetUserSettings(steamId) ?? new UserSetting { UserId = (long)steamId };
+        var setting = _db.GetCachedUserSettings(steamId);
 
         var currentAwpPref = WeaponPrefsHelper.GetPreference(setting, CStrikeTeam.TE, WeaponAllocationType.Preferred);
 
@@ -260,14 +259,14 @@ internal sealed class AllocatorCommandsModule : IModule
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, null);
-            _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
             client.Print(HudPrintChannel.Chat, "[Retakes] AWP preference removed — you will not be given a preferred sniper.");
         }
         else
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
-            _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+            _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
             client.Print(HudPrintChannel.Chat, "[Retakes] AWP preference set — you will be considered for a preferred sniper.");
         }
     }
@@ -380,16 +379,16 @@ internal sealed class AllocatorCommandsModule : IModule
     private void SavePref(IGameClient client, CStrikeTeam team, WeaponAllocationType allocType, CsItem weapon)
     {
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetUserSettings(steamId) ?? new UserSetting { UserId = (long)steamId };
+        var setting = _db.GetCachedUserSettings(steamId);
         setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(setting.WeaponPreferencesJson, team, allocType, weapon);
-        _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
     }
 
     private void ClearPref(IGameClient client, CStrikeTeam team, WeaponAllocationType allocType)
     {
         var steamId = (ulong)client.SteamId;
-        var setting = _db.GetUserSettings(steamId) ?? new UserSetting { UserId = (long)steamId };
+        var setting = _db.GetCachedUserSettings(steamId);
         setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(setting.WeaponPreferencesJson, team, allocType, null);
-        _db.SetWeaponPreference(steamId, setting.WeaponPreferencesJson);
+        _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
     }
 }

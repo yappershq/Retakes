@@ -140,9 +140,9 @@ internal sealed class AllocatorModule : IModule
             else if (controller.Team == CStrikeTeam.CT) ctIds.Add(steamId);
         }
 
-        // ── 2. Batch-load weapon prefs (one WHERE-IN) ──────────────────────
+        // ── 2. Read weapon prefs from in-memory cache (no DB call on game thread) ──────────────────────
         var allIds  = tIds.Concat(ctIds).ToList();
-        var prefMap = _db.GetUsersSettings(allIds); // Dictionary<ulong, UserSetting>
+        var prefMap = allIds.ToDictionary(id => id, id => _db.GetCachedUserSettings(id));
 
         // ── 3. Preferred-weapon (AWP) queue ───────────────────────────────
         HashSet<ulong> tPreferred  = [];

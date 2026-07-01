@@ -11,8 +11,6 @@ namespace Retakes;
 /// </summary>
 internal sealed class InterfaceBridge
 {
-    internal static InterfaceBridge Instance { get; private set; } = null!;
-
     // === Paths ===
     internal string SharpPath  { get; }
     internal string ConfigPath { get; }
@@ -35,7 +33,6 @@ internal sealed class InterfaceBridge
 
     public InterfaceBridge(IModSharpModule module, ISharedSystem sharedSystem, string sharpPath, ILoggerFactory loggerFactory)
     {
-        Instance = this;
         Module   = module;
 
         SharpPath  = sharpPath;

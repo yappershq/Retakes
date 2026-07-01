@@ -20,7 +20,7 @@ namespace Retakes.Zones;
 /// Loads per-map zone definitions and enforces player bounds each tick via PlayerPostThink.
 /// Green zones restrict players to a planted-side area; red zones push players back.
 /// </summary>
-internal sealed class ZonesModule : IModule, IClientListener
+internal sealed class ZonesModule : IModule, IClientListener, IGameListener
 {
     private readonly ILogger<ZonesModule> _logger;
     private readonly InterfaceBridge      _bridge;
@@ -39,6 +39,10 @@ internal sealed class ZonesModule : IModule, IClientListener
     // Stored delegates for deterministic unregister.
     private readonly Action<Bombsite>                  _onBombsiteAnnounced;
     private readonly Action<IPlayerThinkForwardParams> _onPlayerThink;
+
+    // ── IGameListener ──────────────────────────────────────────────────────
+    int IGameListener.ListenerVersion  => IGameListener.ApiVersion;
+    int IGameListener.ListenerPriority => 0;
 
     // ── IClientListener ────────────────────────────────────────────────────
     int IClientListener.ListenerVersion  => IClientListener.ApiVersion;
@@ -65,6 +69,7 @@ internal sealed class ZonesModule : IModule, IClientListener
 
     public void OnPostInit()
     {
+        _bridge.ModSharp.InstallGameListener(this);
         _bridge.ClientManager.InstallClientListener(this);
         _bridge.HookManager.PlayerPostThink.InstallForward(_onPlayerThink);
     }
@@ -80,7 +85,12 @@ internal sealed class ZonesModule : IModule, IClientListener
         _bus.OnAnnounceBombsite -= _onBombsiteAnnounced;
         _bridge.HookManager.PlayerPostThink.RemoveForward(_onPlayerThink);
         _bridge.ClientManager.RemoveClientListener(this);
+        _bridge.ModSharp.RemoveGameListener(this);
     }
+
+    // ── IGameListener impl ─────────────────────────────────────────────────
+
+    void IGameListener.OnServerActivate() => LoadZones();
 
     // ── zone loading ───────────────────────────────────────────────────────
 
