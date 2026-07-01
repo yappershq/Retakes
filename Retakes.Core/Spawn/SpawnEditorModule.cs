@@ -8,6 +8,7 @@ using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.RoundFlow;
 using Retakes.Shared;
+using Retakes.Utils;
 using Sharp.Modules.AdminManager.Shared;
 using Sharp.Modules.CommandCenter.Shared;
 using Sharp.Shared.Enums;
@@ -162,7 +163,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         if (_adminManager?.GetAdmin((SteamID)client.SteamId)?.HasPermission(flag) == true)
             return false;
 
-        client.Print(HudPrintChannel.Chat, "[Retakes] You do not have permission to use this command.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_NoPermission");
         return true;
     }
 
@@ -191,14 +192,14 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (cmd.ArgCount < 1)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Usage: !showspawns [A/B]");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_UsageShow");
             return;
         }
 
         var site = ParseBombsite(cmd.GetArg(1));
         if (site is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must specify a bombsite [A / B].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_SpecifyBombsite");
             return;
         }
 
@@ -216,7 +217,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
                 RefreshViz();
         }, 1.0, GameTimerFlags.StopOnMapEnd);
 
-        client.Print(HudPrintChannel.Chat, $"[Retakes] Editing spawns for bombsite {site}. Use !add / !remove / !nearest, !done to finish.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_Editing", site);
     }
 
     // ── !add [T|CT] [Y|N] ────────────────────────────────────────────────────
@@ -227,20 +228,20 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (_editBombsite is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Enter edit mode first with !showspawns [A/B].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_EnterEditFirst");
             return;
         }
 
         var pawn = GetAlivePawn(client);
         if (pawn is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must have an alive player pawn.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NeedAlivePawn");
             return;
         }
 
         if (cmd.ArgCount < 1)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Usage: !add [T/CT] [Y/N can-be-planter]");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_UsageAdd");
             return;
         }
 
@@ -253,14 +254,14 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         };
         if (team == CStrikeTeam.UnAssigned)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must specify a team [T / CT].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_SpecifyTeam");
             return;
         }
 
         var planterArg = cmd.ArgCount >= 2 ? cmd.GetArg(2).Trim().ToUpperInvariant() : "";
         if (planterArg is not ("" or "Y" or "N"))
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Incorrect can-be-planter value [Y / N].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_BadPlanter");
             return;
         }
 
@@ -273,7 +274,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
             .ToList();
         if (siteSpawns.Any(s => s.Position.DistToSqr(pos) <= 72f * 72f))
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You are too close to another spawn (min 72u).");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_TooClose");
             return;
         }
 
@@ -295,11 +296,12 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         {
             _spawnModule.SpawnManager.Rebuild(_spawnModule.MapConfig);
             RefreshViz();
-            client.Print(HudPrintChannel.Chat, $"[Retakes] Spawn added ({team}{(canBePlanter ? " planter" : "")}).");
+            Loc.Chat(_bridge.LocalizerManager, client,
+                canBePlanter ? "Retakes_Spawn_AddedPlanter" : "Retakes_Spawn_Added", team);
         }
         else
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Error adding spawn (duplicate position?).");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_AddError");
         }
     }
 
@@ -311,14 +313,14 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (_editBombsite is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Enter edit mode first with !showspawns [A/B].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_EnterEditFirst");
             return;
         }
 
         var pawn = GetAlivePawn(client);
         if (pawn is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must have an alive player pawn.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NeedAlivePawn");
             return;
         }
 
@@ -326,7 +328,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         var nearest = FindNearest(pos, _editBombsite.Value, 128f);
         if (nearest is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] No spawn found within 128u.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NoneWithin128");
             return;
         }
 
@@ -334,11 +336,11 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         {
             _spawnModule.SpawnManager.Rebuild(_spawnModule.MapConfig);
             RefreshViz();
-            client.Print(HudPrintChannel.Chat, "[Retakes] Spawn removed.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_Removed");
         }
         else
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Error removing spawn.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_RemoveError");
         }
     }
 
@@ -350,26 +352,26 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (_editBombsite is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Enter edit mode first with !showspawns [A/B].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_EnterEditFirst");
             return;
         }
 
         var pawn = GetAlivePawn(client);
         if (pawn is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must have an alive player pawn.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NeedAlivePawn");
             return;
         }
 
         var nearest = FindNearest(pawn.GetAbsOrigin(), _editBombsite.Value, float.MaxValue);
         if (nearest is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] No spawns found.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NoneFound");
             return;
         }
 
         pawn.Teleport(nearest.Position, nearest.Angles, new Vector());
-        client.Print(HudPrintChannel.Chat, "[Retakes] Teleported to nearest spawn.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_Teleported");
     }
 
     // ── !hidespawns / !done ──────────────────────────────────────────────────
@@ -384,7 +386,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         _bridge.ModSharp.ServerCommand("mp_warmup_pausetimer 0");
         _bridge.ModSharp.ServerCommand("mp_warmup_end");
 
-        client.Print(HudPrintChannel.Chat, "[Retakes] Exited spawn edit mode.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_Exited");
     }
 
     // ── !mapconfig <name> ────────────────────────────────────────────────────
@@ -395,7 +397,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (cmd.ArgCount < 1)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Usage: !mapconfig [filename]");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_UsageMapconfig");
             return;
         }
 
@@ -403,7 +405,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         var path = Path.Combine(_bridge.DataPath, "map_config", $"{name}.json");
         if (!File.Exists(path))
         {
-            client.Print(HudPrintChannel.Chat, $"[Retakes] Map config '{name}' not found.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_MapconfigNotFound", name);
             return;
         }
 
@@ -412,7 +414,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (_editBombsite is not null) RefreshViz();
 
-        client.Print(HudPrintChannel.Chat, $"[Retakes] Loaded map config '{name}'.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_MapconfigLoaded", name);
         _logger.LogInformation("[Retakes] Map config '{Name}' hot-loaded by {Id}.", name, (ulong)client.SteamId);
     }
 
@@ -425,21 +427,21 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         var dir = Path.Combine(_bridge.DataPath, "map_config");
         if (!Directory.Exists(dir))
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] No map configs found.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NoMapConfigs");
             return;
         }
 
         var files = Directory.GetFiles(dir, "*.json").OrderBy(f => f).ToList();
         if (files.Count == 0)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] No map configs found.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_NoMapConfigs");
             return;
         }
 
         foreach (var file in files)
-            client.Print(HudPrintChannel.Chat, $"[Retakes] !mapconfig {Path.GetFileNameWithoutExtension(file)}");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_MapconfigItem", Path.GetFileNameWithoutExtension(file));
 
-        client.Print(HudPrintChannel.Chat, "[Retakes] Available map configs listed above.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_MapconfigsListed");
     }
 
     // ── !forcebombsite [A|B] ─────────────────────────────────────────────────
@@ -450,19 +452,19 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
 
         if (cmd.ArgCount < 1)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Usage: !forcebombsite [A/B]");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_UsageForce");
             return;
         }
 
         var site = ParseBombsite(cmd.GetArg(1));
         if (site is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] You must specify a bombsite [A / B].");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_SpecifyBombsite");
             return;
         }
 
         _roundFlow.SetForcedBombsite(site.Value);
-        client.Print(HudPrintChannel.Chat, $"[Retakes] Bombsite forced to {site}.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_BombsiteForced", site);
     }
 
     // ── !forcebombsitestop ───────────────────────────────────────────────────
@@ -472,7 +474,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         if (Denied(client, _config.Config.Commands.Admin)) return;
 
         _roundFlow.SetForcedBombsite(null);
-        client.Print(HudPrintChannel.Chat, "[Retakes] Bombsite is no longer forced.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_BombsiteUnforced");
     }
 
     // ── !scramble ────────────────────────────────────────────────────────────
@@ -499,8 +501,8 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
             qm.RoundTerrorists.Count,        string.Join(",", qm.RoundTerrorists),
             qm.RoundCounterTerrorists.Count, string.Join(",", qm.RoundCounterTerrorists));
 
-        client.Print(HudPrintChannel.Chat,
-            $"[Retakes] Queues dumped to server console. Active={qm.ActivePlayers.Count} Queue={qm.QueuePlayers.Count}.");
+        Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Spawn_QueuesDumped",
+            qm.ActivePlayers.Count, qm.QueuePlayers.Count);
     }
 
     // ── spawn lookup ─────────────────────────────────────────────────────────
@@ -534,7 +536,7 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         foreach (var spawn in spawns)
             ShowSpawn(spawn);
 
-        _bridge.ModSharp.PrintToChatAll($" [Retakes] Showing {spawns.Count} spawns for bombsite {site}.");
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Spawn_Showing", spawns.Count, site);
     }
 
     private void ShowSpawn(Spawn spawn)
@@ -585,8 +587,12 @@ internal sealed class SpawnEditorModule : IModule, IGameListener
         try
         {
             var teamName = spawn.Team == CStrikeTeam.TE ? "T" : "CT";
-            var planter  = spawn.CanBePlanter ? " [PLANTER]" : "";
-            text.Message = $"{teamName}{planter}\nBombsite {spawn.Bombsite}\n{spawn.Position.X:F0} {spawn.Position.Y:F0} {spawn.Position.Z:F0}";
+            var planter  = spawn.CanBePlanter
+                ? Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_LabelPlanter")
+                : "";
+            text.Message = Loc.Format(_bridge.LocalizerManager, "Retakes_Spawn_Label",
+                teamName, planter, spawn.Bombsite,
+                spawn.Position.X.ToString("F0"), spawn.Position.Y.ToString("F0"), spawn.Position.Z.ToString("F0"));
             text.Enabled          = true;
             text.FontSize         = 25f;
             text.Color            = color;

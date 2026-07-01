@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Retakes.Plugins;
 using Retakes.Shared;
+using Sharp.Modules.LocalizerManager.Shared;
 using Sharp.Shared;
 
 namespace Retakes;
@@ -73,10 +75,35 @@ public sealed class RetakesPlugin : IModSharpModule
 
     public void OnAllModulesLoaded()
     {
+        // Resolve optional localization BEFORE modules' OAM runs so their command handlers see it.
+        _bridge.LocalizerManager = _bridge.SharpModuleManager
+            .GetOptionalSharpModuleInterface<ILocalizerManager>(ILocalizerManager.Identity)?.Instance;
+        LoadLocaleFiles();
+
         foreach (var module in _provider.GetServices<IModule>())
             CallSafe(module, static m => m.OnAllSharpModulesLoaded(), "OnAllModulesLoaded");
 
         _logger.LogInformation("[Retakes] All modules loaded.");
+    }
+
+    /// <summary>Load every <c>retakes*.json</c> under <c>{sharp}/locales/</c> (shipped via .assets/locales).</summary>
+    private void LoadLocaleFiles()
+    {
+        if (_bridge.LocalizerManager is not { } lm)
+        {
+            _logger.LogInformation("[Retakes] ILocalizerManager not available — user-facing text will be silent.");
+            return;
+        }
+
+        var localesPath = Path.Combine(_bridge.SharpPath, "locales");
+        if (!Directory.Exists(localesPath)) return;
+
+        foreach (var file in Directory.GetFiles(localesPath, "retakes*.json"))
+        {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            lm.LoadLocaleFile(fileName);
+            _logger.LogInformation("[Retakes] Loaded locale file: {FileName}", fileName);
+        }
     }
 
     public void Shutdown()

@@ -4,6 +4,7 @@ using Retakes.Database;
 using Retakes.Plugins;
 using Retakes.Queue;
 using Retakes.Shared;
+using Retakes.Utils;
 using Sharp.Modules.CommandCenter.Shared;
 using Sharp.Modules.MenuManager.Shared;
 using Sharp.Shared.Enums;
@@ -14,7 +15,7 @@ using Sharp.Shared.Units;
 namespace Retakes.Allocator;
 
 /// <summary>
-/// Phase D2 — weapon-pref commands (!css_gun, !css_awp, !css_removegun),
+/// Phase D2 — weapon-pref commands (!gun, !awp, !removegun),
 /// !guns menu via IMenuManager, !nextround vote via PushTimer.
 /// </summary>
 internal sealed class AllocatorCommandsModule : IModule
@@ -76,10 +77,10 @@ internal sealed class AllocatorCommandsModule : IModule
         else
         {
             var reg = cc.GetRegistry("retakes");
-            reg.RegisterClientCommand("guns",          OnGunsCommand);
-            reg.RegisterClientCommand("css_gun",       OnCssGunCommand);
-            reg.RegisterClientCommand("css_awp",       OnCssAwpCommand);
-            reg.RegisterClientCommand("css_removegun", OnCssRemoveGunCommand);
+            reg.RegisterClientCommand("guns",      OnGunsCommand);
+            reg.RegisterClientCommand("gun",       OnGunCommand);
+            reg.RegisterClientCommand("awp",       OnAwpCommand);
+            reg.RegisterClientCommand("removegun", OnRemoveGunCommand);
 
             if (_config.Config.Allocator.EnableNextRoundTypeVoting)
                 reg.RegisterClientCommand("nextround", OnNextRoundCommand);
@@ -109,19 +110,19 @@ internal sealed class AllocatorCommandsModule : IModule
 
         if (_menuManager is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Gun menu not available (MenuManager module missing).");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_MenuUnavailable");
             return;
         }
 
-        _menuManager.DisplayMenu(client, BuildGunMenuChain());
+        _menuManager.DisplayMenu(client, BuildGunMenuChain(client));
     }
 
-    // ── !css_gun / !css_removegun ──────────────────────────────────────────
+    // ── !gun / !removegun ──────────────────────────────────────────────────
 
-    private void OnCssGunCommand(IGameClient client, StringCommand cmd)
+    private void OnGunCommand(IGameClient client, StringCommand cmd)
         => HandleWeaponCommand(client, cmd, remove: false);
 
-    private void OnCssRemoveGunCommand(IGameClient client, StringCommand cmd)
+    private void OnRemoveGunCommand(IGameClient client, StringCommand cmd)
         => HandleWeaponCommand(client, cmd, remove: true);
 
     private void HandleWeaponCommand(IGameClient client, StringCommand cmd, bool remove)
@@ -130,13 +131,13 @@ internal sealed class AllocatorCommandsModule : IModule
 
         if (!_config.Config.Allocator.CanPlayersSelectWeapons())
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Weapon selection is disabled.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_SelectionDisabled");
             return;
         }
 
         if (cmd.ArgCount < 1)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Usage: !css_gun <weapon> [T|CT]");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_UsageGun");
             return;
         }
 
@@ -155,7 +156,7 @@ internal sealed class AllocatorCommandsModule : IModule
             };
             if (team == CStrikeTeam.UnAssigned)
             {
-                client.Print(HudPrintChannel.Chat, $"[Retakes] Invalid team '{cmd.GetArg(2)}'. Use T or CT.");
+                Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_InvalidTeam", cmd.GetArg(2));
                 return;
             }
         }
@@ -165,7 +166,7 @@ internal sealed class AllocatorCommandsModule : IModule
         }
         else
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Join a team first or specify T/CT.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_JoinTeamFirst");
             return;
         }
 
@@ -175,53 +176,52 @@ internal sealed class AllocatorCommandsModule : IModule
 
         if (weapon is null)
         {
-            client.Print(HudPrintChannel.Chat, $"[Retakes] Unknown weapon '{weaponInput}'.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_UnknownWeapon", weaponInput);
             return;
         }
 
         if (!WeaponHelpers.IsWeapon(weapon.Value))
         {
-            client.Print(HudPrintChannel.Chat, $"[Retakes] '{weaponInput}' is not a selectable weapon.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_NotSelectable", weaponInput);
             return;
         }
 
         if (!_config.Config.Allocator.IsUsableWeapon(weapon.Value))
         {
-            client.Print(HudPrintChannel.Chat, $"[Retakes] '{weaponInput}' is not allowed on this server.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_NotAllowed", weaponInput);
             return;
         }
 
         var allocType = WeaponHelpers.GetAllocationTypeForWeapon(team, weapon.Value);
         if (allocType is null)
         {
-            client.Print(HudPrintChannel.Chat, $"[Retakes] '{weaponInput}' is not valid for team {team}.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_NotValidForTeam", weaponInput, team);
             return;
         }
 
         var steamId = (ulong)client.SteamId;
         var setting = _db.GetCachedUserSettings(steamId);
 
-        string message;
         if (remove)
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, team, allocType.Value, null);
             _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
-            message = $"[Retakes] Removed {weapon.Value.GetName()} preference for {allocType.Value} ({team}).";
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_PrefRemoved",
+                weapon.Value.GetName(), allocType.Value, team);
         }
         else
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, team, allocType.Value, weapon.Value);
             _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
-            message = $"[Retakes] Set {weapon.Value.GetName()} as your {allocType.Value} preference for {team}.";
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_PrefSet",
+                weapon.Value.GetName(), allocType.Value, team);
 
             // Immediate re-give if in-round, team matches, and not a preferred (AWP-queue) weapon
             if (team == currentTeam && allocType.Value != WeaponAllocationType.Preferred)
                 TryGiveImmediately(client, weapon.Value, allocType.Value);
         }
-
-        client.Print(HudPrintChannel.Chat, message);
     }
 
     private void TryGiveImmediately(IGameClient client, CsItem weapon, WeaponAllocationType allocType)
@@ -244,9 +244,9 @@ internal sealed class AllocatorCommandsModule : IModule
         pawn.GiveNamedItem(weapon.GetName());
     }
 
-    // ── !css_awp ────────────────────────────────────────────────────────────
+    // ── !awp ────────────────────────────────────────────────────────────────
 
-    private void OnCssAwpCommand(IGameClient client, StringCommand _)
+    private void OnAwpCommand(IGameClient client, StringCommand _)
     {
         if (!client.IsInGame) return;
 
@@ -260,14 +260,14 @@ internal sealed class AllocatorCommandsModule : IModule
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, null);
             _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
-            client.Print(HudPrintChannel.Chat, "[Retakes] AWP preference removed — you will not be given a preferred sniper.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_AwpRemoved");
         }
         else
         {
             setting.WeaponPreferencesJson = WeaponPrefsHelper.SetPreference(
                 setting.WeaponPreferencesJson, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
             _db.SetCachedWeaponPreference(steamId, setting.WeaponPreferencesJson);
-            client.Print(HudPrintChannel.Chat, "[Retakes] AWP preference set — you will be considered for a preferred sniper.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_AwpSet");
         }
     }
 
@@ -278,34 +278,35 @@ internal sealed class AllocatorCommandsModule : IModule
         if (!client.IsInGame) return;
         if (_menuManager is null)
         {
-            client.Print(HudPrintChannel.Chat, "[Retakes] Vote menu not available.");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Alloc_VoteMenuUnavailable");
             return;
         }
-        _menuManager.DisplayMenu(client, BuildVoteMenu());
+        _menuManager.DisplayMenu(client, BuildVoteMenu(client));
     }
 
-    // ── Gun menu chain (built bottom-up) ────────────────────────────────────
+    // ── Gun menu chain (built bottom-up, localized to the requesting client) ─
 
-    private Menu BuildGunMenuChain()
+    private Menu BuildGunMenuChain(IGameClient client)
     {
         var cfg = _config.Config.Allocator;
 
-        var awpMenu      = BuildAwpMenu();
-        var ctHalfMenu   = BuildWeaponPageMenu("CT HalfBuy Primary",           CStrikeTeam.CT, WeaponAllocationType.HalfBuyPrimary,  cfg, awpMenu);
-        var tHalfMenu    = BuildWeaponPageMenu("T HalfBuy Primary",             CStrikeTeam.TE, WeaponAllocationType.HalfBuyPrimary,  cfg, ctHalfMenu);
-        var ctPistolMenu = BuildWeaponPageMenu("CT Pistol Round",               CStrikeTeam.CT, WeaponAllocationType.PistolRound,     cfg, tHalfMenu);
-        var tPistolMenu  = BuildWeaponPageMenu("T Pistol Round",                CStrikeTeam.TE, WeaponAllocationType.PistolRound,     cfg, ctPistolMenu);
-        var ctSecMenu    = BuildWeaponPageMenu("CT Secondary (Full/Half-buy)",  CStrikeTeam.CT, WeaponAllocationType.Secondary,       cfg, tPistolMenu);
-        var tSecMenu     = BuildWeaponPageMenu("T Secondary (Full/Half-buy)",   CStrikeTeam.TE, WeaponAllocationType.Secondary,       cfg, ctSecMenu);
-        var ctPrimMenu   = BuildWeaponPageMenu("CT Primary (Full-buy)",         CStrikeTeam.CT, WeaponAllocationType.FullBuyPrimary,  cfg, tSecMenu);
-        return              BuildWeaponPageMenu("T Primary (Full-buy)",          CStrikeTeam.TE, WeaponAllocationType.FullBuyPrimary,  cfg, ctPrimMenu);
+        var awpMenu      = BuildAwpMenu(client);
+        var ctHalfMenu   = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtHalf",      CStrikeTeam.CT, WeaponAllocationType.HalfBuyPrimary, cfg, awpMenu);
+        var tHalfMenu    = BuildWeaponPageMenu(client, "Retakes_Menu_Page_THalf",       CStrikeTeam.TE, WeaponAllocationType.HalfBuyPrimary, cfg, ctHalfMenu);
+        var ctPistolMenu = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtPistol",    CStrikeTeam.CT, WeaponAllocationType.PistolRound,    cfg, tHalfMenu);
+        var tPistolMenu  = BuildWeaponPageMenu(client, "Retakes_Menu_Page_TPistol",     CStrikeTeam.TE, WeaponAllocationType.PistolRound,    cfg, ctPistolMenu);
+        var ctSecMenu    = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtSecondary", CStrikeTeam.CT, WeaponAllocationType.Secondary,      cfg, tPistolMenu);
+        var tSecMenu     = BuildWeaponPageMenu(client, "Retakes_Menu_Page_TSecondary",  CStrikeTeam.TE, WeaponAllocationType.Secondary,      cfg, ctSecMenu);
+        var ctPrimMenu   = BuildWeaponPageMenu(client, "Retakes_Menu_Page_CtPrimary",   CStrikeTeam.CT, WeaponAllocationType.FullBuyPrimary, cfg, tSecMenu);
+        return              BuildWeaponPageMenu(client, "Retakes_Menu_Page_TPrimary",    CStrikeTeam.TE, WeaponAllocationType.FullBuyPrimary, cfg, ctPrimMenu);
     }
 
     private Menu BuildWeaponPageMenu(
-        string title, CStrikeTeam team, WeaponAllocationType allocType, AllocatorSettings cfg, Menu nextMenu)
+        IGameClient client, string titleKey, CStrikeTeam team, WeaponAllocationType allocType, AllocatorSettings cfg, Menu nextMenu)
     {
+        var lm      = _bridge.LocalizerManager;
         var weapons = WeaponHelpers.GetPossibleWeaponsForAllocationType(allocType, team, cfg);
-        var builder = Menu.Create().Title(title);
+        var builder = Menu.Create().Title(Loc.Str(lm, client, titleKey));
         foreach (var weapon in weapons)
         {
             var capturedWeapon = weapon;
@@ -317,57 +318,62 @@ internal sealed class AllocatorCommandsModule : IModule
                 ctrl.Next(nextMenu);
             });
         }
-        builder.Item("Skip", ctrl => ctrl.Next(nextMenu));
+        builder.Item(Loc.Str(lm, client, "Retakes_Menu_Skip"), ctrl => ctrl.Next(nextMenu));
         return builder.Build();
     }
 
-    private Menu BuildAwpMenu()
+    private Menu BuildAwpMenu(IGameClient client)
     {
+        var lm = _bridge.LocalizerManager;
         return Menu.Create()
-            .Title("Sniper Preference")
-            .Item("Request AWP / Sniper (queue-based)", ctrl =>
+            .Title(Loc.Str(lm, client, "Retakes_Menu_SniperPref"))
+            .Item(Loc.Str(lm, client, "Retakes_Menu_RequestAwp"), ctrl =>
             {
                 SavePref(ctrl.Client, CStrikeTeam.TE, WeaponAllocationType.Preferred, CsItem.AWP);
-                ctrl.Client.Print(HudPrintChannel.Chat, "[Retakes] Preferences saved!");
+                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_PrefsSaved");
                 ctrl.Exit();
             })
-            .Item("No preferred sniper", ctrl =>
+            .Item(Loc.Str(lm, client, "Retakes_Menu_NoPreferredSniper"), ctrl =>
             {
                 ClearPref(ctrl.Client, CStrikeTeam.TE, WeaponAllocationType.Preferred);
-                ctrl.Client.Print(HudPrintChannel.Chat, "[Retakes] Preferences saved!");
+                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_PrefsSaved");
                 ctrl.Exit();
             })
-            .ExitItem("Skip / Done")
+            .ExitItem(Loc.Str(lm, client, "Retakes_Menu_SkipDone"))
             .Build();
     }
 
     // ── Vote menu ────────────────────────────────────────────────────────────
 
-    private Menu BuildVoteMenu()
+    private Menu BuildVoteMenu(IGameClient client)
     {
+        var lm            = _bridge.LocalizerManager;
         var activePlayers = _queueModule.QueueManager.ActivePlayers.Count;
 
         return Menu.Create()
-            .Title("Vote: Next Round Type")
-            .Item("Pistol", ctrl =>
+            .Title(Loc.Str(lm, client, "Retakes_Menu_VoteTitle"))
+            .Item(Loc.Str(lm, client, "Retakes_RoundType_Pistol"), ctrl =>
             {
                 _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.Pistol, activePlayers);
-                ctrl.Client.Print(HudPrintChannel.Chat, "[Retakes] Vote cast: Pistol.");
+                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
+                    Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_Pistol"));
                 ctrl.Exit();
             })
-            .Item("Half-Buy", ctrl =>
+            .Item(Loc.Str(lm, client, "Retakes_RoundType_HalfBuy"), ctrl =>
             {
                 _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.HalfBuy, activePlayers);
-                ctrl.Client.Print(HudPrintChannel.Chat, "[Retakes] Vote cast: Half-Buy.");
+                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
+                    Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_HalfBuy"));
                 ctrl.Exit();
             })
-            .Item("Full-Buy", ctrl =>
+            .Item(Loc.Str(lm, client, "Retakes_RoundType_FullBuy"), ctrl =>
             {
                 _voteManager.CastVote((ulong)ctrl.Client.SteamId, RoundType.FullBuy, activePlayers);
-                ctrl.Client.Print(HudPrintChannel.Chat, "[Retakes] Vote cast: Full-Buy.");
+                Loc.Chat(_bridge.LocalizerManager, ctrl.Client, "Retakes_Alloc_VoteCast",
+                    Loc.Str(_bridge.LocalizerManager, ctrl.Client, "Retakes_RoundType_FullBuy"));
                 ctrl.Exit();
             })
-            .ExitItem("Cancel")
+            .ExitItem(Loc.Str(lm, client, "Retakes_Menu_Cancel"))
             .Build();
     }
 

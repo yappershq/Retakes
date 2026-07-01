@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Sharp.Modules.LocalizerManager.Shared;
 using Sharp.Shared;
 using Sharp.Shared.Managers;
 
@@ -30,6 +31,12 @@ internal sealed class InterfaceBridge
     internal ILoggerFactory      LoggerFactory      { get; }
     internal ISharpModuleManager SharpModuleManager { get; }
     internal IModSharpModule     Module             { get; }
+
+    /// <summary>
+    /// Optional localization service. Resolved in <c>OnAllModulesLoaded</c> (never Init/PostInit —
+    /// the publishing plugin may not have registered it yet); null when the module isn't installed.
+    /// </summary>
+    internal ILocalizerManager?  LocalizerManager   { get; set; }
 
     public InterfaceBridge(IModSharpModule module, ISharedSystem sharedSystem, string sharpPath, ILoggerFactory loggerFactory)
     {

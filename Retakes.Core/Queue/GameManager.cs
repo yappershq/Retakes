@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Retakes.Config;
+using Retakes.Utils;
 using Sharp.Shared.Enums;
 using Sharp.Shared.Units;
 
@@ -80,10 +81,8 @@ internal sealed class GameManager
     public void ScrambleNextRound(ulong? adminSteamId)
     {
         _scrambleNextRound = true;
-        var msg = adminSteamId is null
-            ? " [Retakes] Teams will be scrambled next round."
-            : $" [Retakes] Teams will be scrambled next round (by admin).";
-        _bridge.ModSharp.PrintToChatAll(msg);
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager,
+            adminSteamId is null ? "Retakes_Teams_ScrambleNext" : "Retakes_Teams_ScrambleNextAdmin");
     }
 
     // ── team query ─────────────────────────────────────────────────────────
@@ -133,8 +132,8 @@ internal sealed class GameManager
 
         SetTeams(newTerrorists, newCounterTerrorists);
 
-        _bridge.ModSharp.PrintToChatAll(
-            $" [Retakes] CTs win again — teams swapped ({_consecutiveTerroristWins}/{_config.Config.Teams.RoundsToScramble}).");
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Teams_CtSwapped",
+            _consecutiveTerroristWins, _config.Config.Teams.RoundsToScramble);
     }
 
     private void ScrambleTeams()
@@ -146,7 +145,7 @@ internal sealed class GameManager
         var counterTerrorists = active.Skip(targetT).ToList();
 
         SetTeams(terrorists, counterTerrorists);
-        _bridge.ModSharp.PrintToChatAll(" [Retakes] Teams have been scrambled.");
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Teams_Scrambled");
     }
 
     private void SetTeams(IReadOnlyList<ulong> terrorists, IReadOnlyList<ulong> counterTerrorists)

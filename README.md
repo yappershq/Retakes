@@ -35,6 +35,7 @@ Copy build output and config to your ModSharp installation (`<sharp>` = your `sh
 | `.build/modules/Retakes.Core/` | `<sharp>/modules/Retakes.Core/` |
 | `.assets/configs.example/retakes/retakes.json` | `<sharp>/configs/retakes/retakes.json` |
 | `.assets/data/retakes/map_config/*.json` | `<sharp>/data/retakes/map_config/` |
+| `.assets/locales/retakes.json` | `<sharp>/locales/retakes.json` |
 
 Fill in `database.connection_string` in the deployed config and create the `retakes` MySQL database before starting the server. The `retakes_user_settings` table is created automatically on first connect.
 
@@ -115,9 +116,9 @@ Fill in `database.connection_string` in the deployed config and create the `reta
 |---------|-------------|
 | `!voices` | Toggle bombsite voice-over announcements on/off for yourself. |
 | `!guns` | Open the weapon-preference menu. |
-| `!css_gun <weapon> [T\|CT]` | Set preferred primary weapon via chat. |
-| `!css_awp [T\|CT]` | Set AWP as preferred primary weapon. |
-| `!css_removegun [T\|CT]` | Clear preferred weapon preference. |
+| `!gun <weapon> [T\|CT]` | Set preferred primary weapon via chat. |
+| `!awp [T\|CT]` | Set AWP as preferred primary weapon. |
+| `!removegun [T\|CT]` | Clear preferred weapon preference. |
 | `!nextround` | Vote for the next round type (when voting is enabled). |
 
 ### Admin commands

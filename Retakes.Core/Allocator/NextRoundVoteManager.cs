@@ -1,4 +1,5 @@
 using Retakes.Shared;
+using Retakes.Utils;
 using Sharp.Shared.Enums;
 
 namespace Retakes.Allocator;
@@ -40,7 +41,7 @@ internal sealed class NextRoundVoteManager
                 GameTimerFlags.StopOnMapEnd | GameTimerFlags.StopOnRoundEnd
             );
 
-            BroadcastChat("[Retakes] Vote started! Type !nextround to vote for the next round type.");
+            Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Started");
         }
 
         _votes[steamId] = roundType;
@@ -56,7 +57,7 @@ internal sealed class NextRoundVoteManager
 
         if (_votes.Count == 0 || _activePlayers == 0)
         {
-            BroadcastChat("[Retakes] Vote ended — no votes cast.");
+            Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_NoVotes");
             _votes.Clear();
             return;
         }
@@ -72,7 +73,7 @@ internal sealed class NextRoundVoteManager
         var highestCount = tally.Values.Max();
         if ((double)highestCount / _activePlayers < EnoughVotesThreshold)
         {
-            BroadcastChat("[Retakes] Vote failed — not enough players voted.");
+            Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Failed");
             _votes.Clear();
             return;
         }
@@ -82,9 +83,17 @@ internal sealed class NextRoundVoteManager
         var winner  = winners[Random.Shared.Next(winners.Count)];
 
         _roundTypeManager.SetNextRoundTypeOverride(winner);
-        BroadcastChat($"[Retakes] Vote complete! Next round will be {winner}.");
+        var winnerName = Loc.Format(_bridge.LocalizerManager, RoundTypeKey(winner));
+        Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Vote_Complete", winnerName);
         _votes.Clear();
     }
+
+    internal static string RoundTypeKey(RoundType roundType) => roundType switch
+    {
+        RoundType.Pistol  => "Retakes_RoundType_Pistol",
+        RoundType.HalfBuy => "Retakes_RoundType_HalfBuy",
+        _                 => "Retakes_RoundType_FullBuy",
+    };
 
     /// <summary>Call each round start to clear state from the previous round.</summary>
     public void Reset()
@@ -96,14 +105,5 @@ internal sealed class NextRoundVoteManager
         }
         _votes.Clear();
         _activePlayers = 0;
-    }
-
-    private void BroadcastChat(string msg)
-    {
-        foreach (var client in _bridge.ClientManager.GetGameClients(inGame: true))
-        {
-            if (client.IsFakeClient) continue;
-            client.Print(HudPrintChannel.Chat, msg);
-        }
     }
 }

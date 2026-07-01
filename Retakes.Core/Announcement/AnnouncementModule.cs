@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Shared;
+using Retakes.Utils;
 using Sharp.Modules.ClientPreferences.Shared;
 using Sharp.Modules.CommandCenter.Shared;
 using Sharp.Shared.Enums;
@@ -117,13 +118,13 @@ internal sealed class AnnouncementModule : IModule, IClientListener
             if (client is not { IsInGame: true })            continue;
 
             // a. Chat announcement to everyone.
-            client.Print(HudPrintChannel.Chat, $"[Retakes] Bombsite {siteStr}!");
+            Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Bombsite_Announce", siteStr);
 
             // b. Center text for CTs only.
             if (_config.Config.MapConfig.EnableBombsiteAnnouncementCenter
                 && controller.Team == CStrikeTeam.CT)
             {
-                client.Print(HudPrintChannel.Center, $"Bombsite {siteStr}");
+                Loc.Center(_bridge.LocalizerManager, client, "Retakes_Bombsite_Center", siteStr);
             }
 
             // c. Voice cue (if not muted).
@@ -157,8 +158,9 @@ internal sealed class AnnouncementModule : IModule, IClientListener
                 _voicesMuted.Add((ulong)steamId);
         }
 
-        var state = isMuted ? "enabled" : "disabled";
-        client.Print(HudPrintChannel.Chat, $"Voices [{state}]");
+        // isMuted reflects the PRE-toggle state; if it was muted we've just enabled voices.
+        Loc.Chat(_bridge.LocalizerManager, client,
+            isMuted ? "Retakes_Voices_Enabled" : "Retakes_Voices_Disabled");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────
