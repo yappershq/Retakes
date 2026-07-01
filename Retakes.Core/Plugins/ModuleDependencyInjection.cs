@@ -80,6 +80,10 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<AllocatorCommandsModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<AllocatorCommandsModule>());
 
+        // D3: mid-round buy control (PlayerCanAcquire hook) + preference save + stray cleanup
+        services.AddSingleton<BuyControlModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<BuyControlModule>());
+
         return services;
     }
 }

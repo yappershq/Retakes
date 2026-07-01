@@ -7,6 +7,7 @@ using Retakes.Queue;
 using Retakes.Shared;
 using Sharp.Modules.AdminManager.Shared;
 using Sharp.Shared.Enums;
+using Sharp.Shared.Objects;
 using Sharp.Shared.Units;
 
 namespace Retakes.Allocator;
@@ -44,6 +45,13 @@ internal sealed class AllocatorModule : IModule
 
     private IAdminManager? _adminManager;
     private readonly Action _onAllocate;
+
+    /// <summary>
+    /// True while HandleAllocate() is running (cleared ~0.5s after allocation completes).
+    /// BuyControlModule reads this to skip the CanAcquire block during server-side GiveNamedItem,
+    /// guarding against engine builds where GiveNamedItem flows through CanAcquire.
+    /// </summary>
+    internal bool IsAllocating { get; private set; }
 
     public AllocatorModule(
         ILogger<AllocatorModule> logger,
@@ -105,6 +113,14 @@ internal sealed class AllocatorModule : IModule
     private void HandleAllocate()
     {
         if (!_config.Config.Allocator.Enabled) return;
+
+        // Signal BuyControlModule to pass-through CanAcquire while we give weapons.
+        IsAllocating = true;
+        _bridge.ModSharp.PushTimer(
+            () => { IsAllocating = false; },
+            0.5,
+            GameTimerFlags.StopOnMapEnd | GameTimerFlags.StopOnRoundEnd
+        );
 
         var roundType = _bus.CurrentRoundType;
         var allocCfg  = _config.Config.Allocator;

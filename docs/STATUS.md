@@ -10,8 +10,8 @@ Build check: `cd /home/claude/Retakes && env -u version dotnet build -c Release`
 - [x] **B2. Round flow** — RoundFlowModule + fallback alloc + assister scoring. GREEN. Core spine done.
 - [x] **C. Combat round** — breaker/announce/defuse/zones + synthetic auto-plant (mcp-verified). GREEN.
   - CAVEAT (live-test): planted_c4 timer countdown init unproven headless; m_flC4Blow/m_flTimerLength settable; TerminateRound timer fallback if needed.
-- [~] **D. Allocator** — [x] D1 alloc core; [x] D2 menus+votes+commands GREEN; [ ] D3 CanAcquire buy-block
-- [ ] **E. Spawn editor.**
+- [x] **D. Allocator** — round types, weapon/nade/armor alloc, SqlSugar prefs, menus, voting, mid-round buy-block (PlayerCanAcquire hard-block). GREEN.
+- [~] **E. Spawn editor.**
 - [ ] **F. Review** — anti-pattern pass, README, configs.example, lang, gamedata; create+push public GitHub repo.
 
 ## Notes / decisions
