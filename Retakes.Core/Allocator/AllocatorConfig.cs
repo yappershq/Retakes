@@ -167,6 +167,14 @@ public class AllocatorSettings
     [JsonPropertyName("zeus_preference")]
     public ZeusPreference ZeusPreference { get; set; } = ZeusPreference.Never;
 
+    // ── D2 features ───────────────────────────────────────────────────────
+
+    [JsonPropertyName("enable_next_round_type_voting")]
+    public bool EnableNextRoundTypeVoting { get; set; } = true;
+
+    [JsonPropertyName("allow_allocation_after_freeze_time")]
+    public bool AllowAllocationAfterFreezeTime { get; set; } = false;
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     public double GetRoundTypePercentage(RoundType roundType)

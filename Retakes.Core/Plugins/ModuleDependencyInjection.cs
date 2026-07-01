@@ -76,6 +76,10 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<AllocatorModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<AllocatorModule>());
 
+        // D2: weapon-pref commands + gun menu + !nextround vote
+        services.AddSingleton<AllocatorCommandsModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<AllocatorCommandsModule>());
+
         return services;
     }
 }

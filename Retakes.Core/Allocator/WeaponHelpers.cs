@@ -182,6 +182,25 @@ public static class WeaponHelpers
             .ToList();
     }
 
+    /// <summary>Get the WeaponAllocationType for a weapon+team combination.</summary>
+    public static WeaponAllocationType? GetAllocationTypeForWeapon(CStrikeTeam team, CsItem weapon)
+    {
+        if (team != CStrikeTeam.TE && team != CStrikeTeam.CT) return null;
+        var byType = _validWeaponsByTeamAndType[team];
+        foreach (var (allocType, set) in byType)
+            if (set.Contains(weapon)) return allocType;
+        return null;
+    }
+
+    /// <summary>Get all RoundTypes where the given allocation type is valid.</summary>
+    public static IReadOnlyList<RoundType> GetRoundTypesForAllocationType(WeaponAllocationType allocType)
+    {
+        return _validTypesForRound
+            .Where(kvp => kvp.Value.Contains(allocType))
+            .Select(kvp => kvp.Key)
+            .ToList();
+    }
+
     /// <summary>
     /// Coerce an auto-sniper to the team-appropriate variant.
     /// AWP is team-agnostic; auto-snipers have T/CT variants.
