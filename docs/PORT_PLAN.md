@@ -15,10 +15,13 @@ Directory.Build.props        # net10.0; .build/modules|shared output; ModSharp.S
 .gitignore
 Retakes.Shared/             # PUBLIC contract — NO ORM / 3rd-party types
 Retakes.Core/               # IModSharpModule entry + all internal modules
-Retakes.Database/           # SqlSugar prefs (keeps ORM out of Shared)
+Retakes.Vip/                # optional module: implements IRetakesVipProvider via Vip.Shared
 .assets/                    # gamedata (if needed), configs.example, lang
 docs/
 ```
+> **As-built note:** the originally-planned `Retakes.Database` (SqlSugar prefs) was dropped — weapon prefs
+> now use `IClientPreference` cookies (commit 189662a), so there is no ORM and no separate DB project. A
+> `Retakes.Vip` module was added during hardening (docs/HARDENING.md chunk 3) to keep Core VIP-agnostic.
 Why one plugin (not 4): originals couple via a CSS PluginCapability event bus; in-process we make that bus INTERNAL. Keep `Retakes.Shared` as a public `IRetakesService` so external plugins (custom HUD etc.) can still consume retake events — preserves the original extensibility.
 
 ## Retakes.Shared (public contract)
@@ -41,7 +44,7 @@ Why one plugin (not 4): originals couple via a CSS PluginCapability event bus; i
 8. **AnnouncementModule** — bombsite chat/center/voice announce + per-player `!voices` mute.
 9. **DefuseModule** — bomb_planted → give every kit-less CT `item_defuser` (the DefuseFix port).
 10. **ZonesModule** — load zone JSON per map; on OnAnnounceBombsite assign per-player zones; per-frame (PlayerPostThink / frame action) AABB check → bounce (SetAbsVelocity reversal + up-kick via Teleport/ApplyAbsVelocityImpulse).
-11. **AllocatorModule** (+ RoundTypeManager, WeaponHelpers, NadeHelpers, menus, votes, CanAcquire) — the heavy one; consumes OnAllocate. Prefs via Retakes.Database. See allocator notes below.
+11. **AllocatorModule** (+ RoundTypeManager, WeaponHelpers, NadeHelpers, menus, votes, CanAcquire) — the heavy one; consumes OnAllocate. Prefs via `IClientPreference` cookies (as-built; the `Retakes.Database` SqlSugar plan below was dropped). See allocator notes below.
 12. **SpawnEditorModule** — `!showspawns/!add/!remove/!nearest/!done`; viz via prop_dynamic + point_worldtext (editor-only; degraded viz acceptable).
 13. **EventBusModule** — implements + publishes `IRetakesService` (RegisterSharpModuleInterface in PostInit).
 
@@ -50,7 +53,9 @@ Why one plugin (not 4): originals couple via a CSS PluginCapability event bus; i
 - Give items: `pawn.GiveNamedItem("weapon_ak47" | "item_assaultsuit" | "weapon_taser" | …)`. Armor: `pawn.ArmorValue = N` + `pawn.GetItemService().HasHelmet = true`. Defuser: `pawn.GetItemService().HasDefuser = true` (schema, not give). Money: not set (core handles). `mp_max_armor 0` via convar.
 - Nade allocation: team budget (MaxTeamNades) + per-type caps (MaxNades), round-robin to shuffled team.
 - Preferred (AWP) queue: chance roll + VIP weighting + per-team cap.
-- Prefs: `Retakes.Database` SqlSugar table `retakes_user_settings(UserId long PK, WeaponPreferencesJson text)`; batch-load `WHERE UserId IN (...)` each round; fire-and-forget upsert on change. **ulong→long at CLR boundary.**
+- Prefs (**as-built**): `IClientPreference` cookies keyed by SteamID64 — no ORM, no DB project. (The
+  original plan — a `Retakes.Database` SqlSugar table `retakes_user_settings` batch-loaded per round — was
+  dropped in commit 189662a in favour of the cookie store.)
 - CanAcquire buy-blocking: **HARDEST.** CSS hooks native `CCSPlayer_ItemServices_CanAcquire`. Investigate ModSharp options in order: (a) an item-pickup/purchase forward we can block via HookFireEvent→false; (b) convar-based weapon restriction; (c) gamedata signature + detour. Pick the cleanest; if none clean, ship allocator without hard buy-blocking v1 and note it.
 - Menus: `IMenuManager` fluent (chat). WASD center menu: port via frame action + button polling, or use IMenuManager center menu if available.
 
@@ -65,15 +70,17 @@ Why one plugin (not 4): originals couple via a CSS PluginCapability event bus; i
 - Menus: `IMenuManager` fluent `Menu.Create()...Build()`. Prefs: `IClientPreference` cookies (light) / own DB (structured).
 - Lifecycle: entry ctor `(ISharedSystem, string dllPath, string sharpPath, Version, IConfiguration, bool hotReload)`. Publish `RegisterSharpModuleInterface<T>(this, T.Identity, impl)` in PostInit; consume `GetOptionalSharpModuleInterface<T>(T.Identity)` in OnAllModulesLoaded (cache wrapper).
 
-## Anti-pattern checklist (must pass review)
-- [ ] No CSS APIs (AddTimer/RegisterEventHandler/GetPlayers/PlayerPawn.Value) — all nonexistent in ModSharp.
-- [ ] No storing IGameClient/pawn pointers across callbacks/rounds — re-resolve by slot/SteamID64.
-- [ ] No raw `PointerTo<T>` entity dereference — use IEntityManager safe enumeration.
-- [ ] No direct Health writes for damage.
-- [ ] No ORM / 3rd-party types in Retakes.Shared (TypeLoad).
-- [ ] Locale colors `{{double-brace}}`.
-- [ ] No SpawnEntitySync double-dispatch.
-- [ ] Publishers PostInit, consumers OnAllModulesLoaded.
+## Anti-pattern checklist (verified in the hardening convention sweep — docs/HARDENING.md chunk 5)
+- [x] No CSS APIs (AddTimer/RegisterEventHandler/GetPlayers/PlayerPawn.Value) — all nonexistent in ModSharp.
+- [x] No storing IGameClient/pawn pointers across callbacks/rounds — re-resolve by slot/SteamID64.
+- [x] No raw `PointerTo<T>` entity dereference — IEntityManager safe enumeration; entities held as `EntityIndex`.
+- [x] No direct Health writes for damage.
+- [x] No ORM / 3rd-party types in Retakes.Shared (TypeLoad).
+- [x] Locale colors `{{double-brace}}`.
+- [x] No SpawnEntitySync double-dispatch.
+- [x] Publishers PostInit, consumers OnAllModulesLoaded.
+- [x] No `css_` command prefixes; all user-facing text via ILocalizerManager; no `.Next()` menu chaining;
+      every `IEventListener` has matching `HookEvent`.
 
 ## Spawn data model (reuse CSS format)
 `map_config/<map>.json`: `{ "Spawns": [ { "Vector":"X Y Z", "QAngle":"P Y R", "Team":2|3, "Bombsite":0|1, "CanBePlanter":bool } ] }`. Team 2=T,3=CT. At least one CanBePlanter T spawn per site. 11 shipped configs to copy from cs2-retakes.

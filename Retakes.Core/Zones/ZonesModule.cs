@@ -8,6 +8,8 @@ using Retakes.Config;
 using Retakes.Plugins;
 using Retakes.Shared;
 using Sharp.Shared.Enums;
+using Sharp.Shared.GameEntities;
+using Sharp.Shared.GameEvents;
 using Sharp.Shared.HookParams;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Objects;
@@ -20,7 +22,7 @@ namespace Retakes.Zones;
 /// Loads per-map zone definitions and enforces player bounds each tick via PlayerPostThink.
 /// Green zones restrict players to a planted-side area; red zones push players back.
 /// </summary>
-internal sealed class ZonesModule : IModule, IClientListener, IGameListener
+internal sealed class ZonesModule : IModule, IClientListener, IGameListener, IEventListener
 {
     private readonly ILogger<ZonesModule> _logger;
     private readonly InterfaceBridge      _bridge;
@@ -49,6 +51,10 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
     int IClientListener.ListenerVersion  => IClientListener.ApiVersion;
     int IClientListener.ListenerPriority => 0;
 
+    // ── IEventListener ─────────────────────────────────────────────────────
+    int IEventListener.ListenerVersion  => IEventListener.ApiVersion;
+    int IEventListener.ListenerPriority => 0;
+
     public ZonesModule(
         ILogger<ZonesModule> logger,
         InterfaceBridge      bridge,
@@ -73,6 +79,12 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
         _bridge.ModSharp.InstallGameListener(this);
         _bridge.ClientManager.InstallClientListener(this);
         _bridge.HookManager.PlayerPostThink.InstallForward(_onPlayerThink);
+
+        // Late/respawned players miss the one-shot OnBombsiteAnnounced pass (they had no alive
+        // pawn at announce time) → they'd get no zone assignment for the round. Assigning on
+        // player_spawned covers them. FireGameEvent only fires for explicitly-hooked events.
+        _bridge.EventManager.HookEvent("player_spawned");
+        _bridge.EventManager.InstallEventListener(this);
     }
 
     public void OnAllSharpModulesLoaded()
@@ -85,6 +97,7 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
     {
         _bus.OnAnnounceBombsite -= _onBombsiteAnnounced;
         _bridge.HookManager.PlayerPostThink.RemoveForward(_onPlayerThink);
+        _bridge.EventManager.RemoveEventListener(this);
         _bridge.ClientManager.RemoveClientListener(this);
         _bridge.ModSharp.RemoveGameListener(this);
     }
@@ -160,17 +173,30 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
             var client = controller.GetGameClient();
             if (client is not { IsInGame: true })            continue;
 
-            var state = _playerStates[client.Slot.AsPrimitive()];
-            if (state is null)
-            {
-                state = new PlayerZoneState();
-                _playerStates[client.Slot.AsPrimitive()] = state;
-            }
-
-            var team = (int)controller.Team;
-            state.Zones      = _zones[site].Where(z => z.Teams.Contains(team)).ToList();
-            state.GreenZones = [];
+            AssignZones(site, client.Slot, (int)controller.Team);
         }
+    }
+
+    /// <summary>
+    /// (Re)assign the round's zones to a single player, resolved by slot. Called once per player
+    /// from <see cref="OnBombsiteAnnounced"/> (alive-at-announce) and again from player_spawned so
+    /// dead/late/respawned players — who had no alive pawn when the site was announced — are still
+    /// covered for the rest of the round.
+    /// </summary>
+    private void AssignZones(Bombsite site, PlayerSlot slot, int team)
+    {
+        if (!slot.IsValid()) return;
+
+        var idx   = slot.AsPrimitive();
+        var state = _playerStates[idx];
+        if (state is null)
+        {
+            state = new PlayerZoneState();
+            _playerStates[idx] = state;
+        }
+
+        state.Zones      = _zones[site].Where(z => z.Teams.Contains(team)).ToList();
+        state.GreenZones = [];
     }
 
     // ── PlayerPostThink forward ───────────────────────────────────────────
@@ -231,6 +257,26 @@ internal sealed class ZonesModule : IModule, IClientListener, IGameListener
             vel.Z <= 0f ? 150f : Math.Min(vel.Z, 150f));
 
         pawn.Teleport(null, null, newVel);
+    }
+
+    // ── IEventListener impl ────────────────────────────────────────────────
+
+    void IEventListener.FireGameEvent(IGameEvent @event)
+    {
+        if (!@event.GetName().Equals("player_spawned", StringComparison.Ordinal)) return;
+
+        var controller = @event.GetPlayerController("userid");
+        if (controller is null || !controller.IsValid() || controller.IsFakeClient) return;
+
+        var pawn = controller.GetPlayerPawn();
+        if (pawn is null || !pawn.IsAlive) return;
+
+        var client = controller.GetGameClient();
+        if (client is not { IsInGame: true }) return;
+
+        // Assign the round's zones for the site already announced this round. EventBus.CurrentBombsite
+        // holds the last-announced site, so a spectator-joiner or mid-round respawn gets the live site.
+        AssignZones(_bus.CurrentBombsite, client.Slot, (int)controller.Team);
     }
 
     // ── IClientListener impl ──────────────────────────────────────────────
