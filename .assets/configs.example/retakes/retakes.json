@@ -1,0 +1,132 @@
+{
+  "game": {
+    "max_players": 9,
+    "should_break_breakables": false,
+    "should_open_doors": false,
+    "enable_fallback_allocation": false
+  },
+  "queue": {
+    "priority_flags": [
+      {
+        "display_name": "VIP",
+        "flag": "@css/vip",
+        "priority": 0
+      }
+    ],
+    "immunity_flags": [],
+    "should_remove_spectators": true,
+    "should_auto_join_spectators": true
+  },
+  "teams": {
+    "terrorist_ratio": 0.45,
+    "rounds_to_scramble": 5,
+    "is_scramble_enabled": true,
+    "is_balance_enabled": true,
+    "should_prevent_team_changes_mid_round": true
+  },
+  "map_config": {
+    "enable_bombsite_announcement_center": true,
+    "enable_bombsite_announcement_voices": true
+  },
+  "bomb": {
+    "is_auto_plant_enabled": true
+  },
+  "database": {
+    "connection_string": "Server=127.0.0.1;Database=retakes;Uid=retakes;Pwd=CHANGE_ME;Maximum Pool Size=4"
+  },
+  "commands": {
+    "spawn_editor_flag": "@css/root",
+    "map_config_flag": "@css/root",
+    "admin_flag": "@css/admin"
+  },
+  "allocator": {
+    "enabled": true,
+    "allowed_weapon_selection_types": [ "PlayerChoice", "Random", "Default" ],
+    "usable_weapons": [
+      "weapon_ak47", "weapon_m4a1_silencer", "weapon_m4a1",
+      "weapon_awp", "weapon_sg556", "weapon_aug",
+      "weapon_famas", "weapon_galilar",
+      "weapon_mac10", "weapon_mp9", "weapon_mp5sd", "weapon_mp7",
+      "weapon_ump45", "weapon_p90", "weapon_bizon",
+      "weapon_nova", "weapon_sawedoff", "weapon_xm1014", "weapon_mag7",
+      "weapon_m249", "weapon_negev",
+      "weapon_deagle", "weapon_elite", "weapon_fiveseven",
+      "weapon_glock", "weapon_p250", "weapon_usp_silencer",
+      "weapon_tec9", "weapon_cz75a", "weapon_revolver", "weapon_p2000"
+    ],
+    "default_weapons": {
+      "TE": {
+        "FullBuyPrimary":  "weapon_ak47",
+        "HalfBuyPrimary":  "weapon_mac10",
+        "Secondary":       "weapon_deagle",
+        "PistolRound":     "weapon_glock"
+      },
+      "CT": {
+        "FullBuyPrimary":  "weapon_m4a1_silencer",
+        "HalfBuyPrimary":  "weapon_mp9",
+        "Secondary":       "weapon_deagle",
+        "PistolRound":     "weapon_usp_silencer"
+      }
+    },
+    "round_type_selection": "Random",
+    "round_type_percentages": {
+      "0": 15,
+      "1": 25,
+      "2": 60
+    },
+    "round_type_random_fixed_counts": {
+      "0": 5,
+      "1": 10,
+      "2": 15
+    },
+    "round_type_manual_ordering": [
+      { "Type": 0, "Count": 5  },
+      { "Type": 1, "Count": 10 },
+      { "Type": 2, "Count": 15 }
+    ],
+    "max_nades": {
+      "GLOBAL": {
+        "TE": {
+          "weapon_flashbang":    2,
+          "weapon_smokegrenade": 1,
+          "weapon_molotov":      1,
+          "weapon_hegrenade":    1
+        },
+        "CT": {
+          "weapon_flashbang":    2,
+          "weapon_smokegrenade": 1,
+          "weapon_incgrenade":   2,
+          "weapon_hegrenade":    1
+        }
+      }
+    },
+    "max_team_nades": {
+      "GLOBAL": {
+        "TE": {
+          "0": "AverageOnePerPlayer",
+          "1": "AverageOnePointFivePerPlayer",
+          "2": "AverageOnePointFivePerPlayer"
+        },
+        "CT": {
+          "0": "AverageOnePerPlayer",
+          "1": "AverageOnePointFivePerPlayer",
+          "2": "AverageOnePointFivePerPlayer"
+        }
+      }
+    },
+    "chance_for_preferred_weapon": 100,
+    "allow_preferred_weapon_for_everyone": false,
+    "max_preferred_weapons_per_team": {
+      "TE": 1,
+      "CT": 1
+    },
+    "min_players_per_team_for_preferred": {
+      "TE": 1,
+      "CT": 1
+    },
+    "number_of_extra_vip_chances_for_preferred": 1,
+    "zeus_preference": "Never",
+    "enable_next_round_type_voting": true,
+    "allow_allocation_after_freeze_time": false
+  }
+}
