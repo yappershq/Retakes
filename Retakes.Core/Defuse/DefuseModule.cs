@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Retakes.Plugins;
 using Sharp.Shared.Enums;
-using Sharp.Shared.GameEntities;
 using Sharp.Shared.GameEvents;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Objects;
@@ -11,9 +11,10 @@ namespace Retakes.Defuse;
 
 /// <summary>
 /// Gives every alive CT player a defuser kit when the bomb is planted, and — port of
-/// Souplax1/InstaDefuse — instantly completes a defuse when the last T is dead and there's
-/// enough time left to have finished normally, or lets the bomb go off if there isn't. Skips
-/// instant-defuse (falls back to a manual defuse) if a molotov/incendiary is burning within
+/// Souplax1/InstaDefuse (with the molotov tracking approach cross-checked against
+/// a2Labs-cc/SwiftlyS2-Retakes) — instantly completes a defuse when the last T is dead and
+/// there's enough time left to have finished normally, or lets the bomb go off if there isn't.
+/// Skips instant-defuse (falls back to a manual defuse) if a molotov/incendiary is burning within
 /// <see cref="MolotovExclusionRadius"/> units of the bomb.
 /// </summary>
 internal sealed class DefuseModule : IModule, IEventListener
@@ -22,6 +23,11 @@ internal sealed class DefuseModule : IModule, IEventListener
 
     private readonly ILogger<DefuseModule> _logger;
     private readonly InterfaceBridge        _bridge;
+
+    // Tracked via inferno_startburn/inferno_expire (entityid → position) rather than scanning
+    // entities by classname at defuse-time — SwiftlyS2-Retakes' proven approach, and it sidesteps
+    // relying on an unverified "inferno" entity classname for FindEntityByClassname.
+    private readonly Dictionary<int, Vector> _activeInfernos = new();
 
     // ── IEventListener ─────────────────────────────────────────────────────
     int IEventListener.ListenerVersion  => IEventListener.ApiVersion;
@@ -44,6 +50,8 @@ internal sealed class DefuseModule : IModule, IEventListener
         // FireGameEvent only fires for hooked events.
         _bridge.EventManager.HookEvent("bomb_planted");
         _bridge.EventManager.HookEvent("bomb_begindefuse");
+        _bridge.EventManager.HookEvent("inferno_startburn");
+        _bridge.EventManager.HookEvent("inferno_expire");
         _bridge.EventManager.InstallEventListener(this);
     }
 
@@ -64,6 +72,20 @@ internal sealed class DefuseModule : IModule, IEventListener
 
             case IEventBombBeginDefuse begin:
                 TryInstantDefuse(begin);
+                break;
+
+            default:
+                switch (@event.Name)
+                {
+                    case "inferno_startburn":
+                        _activeInfernos[@event.GetInt("entityid")] =
+                            new Vector(@event.GetFloat("x"), @event.GetFloat("y"), @event.GetFloat("z"));
+                        break;
+
+                    case "inferno_expire":
+                        _activeInfernos.Remove(@event.GetInt("entityid"));
+                        break;
+                }
                 break;
         }
     }
@@ -121,11 +143,14 @@ internal sealed class DefuseModule : IModule, IEventListener
 
     private bool IsMolotovNearby(Vector bombPos)
     {
-        IBaseEntity? cur = null;
-        while ((cur = _bridge.EntityManager.FindEntityByClassname(cur, "inferno")) is not null)
+        foreach (var fire in _activeInfernos.Values)
         {
-            if (!cur.IsValidEntity) continue;
-            if ((cur.GetAbsOrigin() - bombPos).Length() <= MolotovExclusionRadius)
+            // 2D distance (ignore Z) — matches SwiftlyS2-Retakes: fire spreads across the floor
+            // plane, and a molotov thrown from a different height above the bombsite still
+            // counts as "near" for this check.
+            var dx = fire.X - bombPos.X;
+            var dy = fire.Y - bombPos.Y;
+            if (dx * dx + dy * dy <= MolotovExclusionRadius * MolotovExclusionRadius)
                 return true;
         }
         return false;
