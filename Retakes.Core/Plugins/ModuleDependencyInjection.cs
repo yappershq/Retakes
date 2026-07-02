@@ -8,6 +8,7 @@ using Retakes.Defuse;
 using Retakes.Modules;
 using Retakes.Player;
 using Retakes.Queue;
+using Retakes.Debug;
 using Retakes.RoundFlow;
 using Retakes.Shared;
 using Retakes.Spawn;
@@ -93,6 +94,10 @@ internal static class ModuleDependencyInjection
         // E: in-game spawn editor + map-config + admin commands
         services.AddSingleton<SpawnEditorModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<SpawnEditorModule>());
+
+        // TEMPORARY — remove once #1 (Sounds) is implemented for real (see SoundDebugModule doc).
+        services.AddSingleton<SoundDebugModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<SoundDebugModule>());
 
         return services;
     }
