@@ -213,6 +213,12 @@ internal sealed class BombModule : IModule, IEventListener
         //    DefuseModule's IEventBombPlanted listener receives it automatically — no extra wiring.
         FireBombPlantedEvent(controller, bombsite);
 
+        // Synthetic plant skips the native weapon_c4 plant sequence entirely, so the plant
+        // confirmation sound never fires on its own — emit it explicitly. Name confirmed from
+        // CS:GO source (weapon_c4.cpp PrecacheScriptSound("c4.plant")); CS2 kept the legacy name.
+        foreach (var client in _bridge.ClientManager.GetGameClients(true))
+            client.GetPlayerController()?.EmitSoundClient("c4.plant");
+
         return true;
     }
 

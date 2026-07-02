@@ -233,6 +233,13 @@ internal sealed class RoundFlowModule : IModule, IEventListener
             : "Retakes_Team_Terrorists";
         var teamStr = Loc.Format(_bridge.LocalizerManager, teamKey);
         Loc.ChatAll(_bridge.LocalizerManager, _bridge.ClientManager, "Retakes_Round_Winner", teamStr);
+
+        // We suppress the native round_end broadcast (RoundEventSuppressModule), which also kills
+        // the native win-panel's music — fire the jingle ourselves. Names confirmed from CS:GO
+        // source (clientmode_csnormal.cpp); CS2 kept the legacy Event.* soundevent names.
+        var winSound = _lastRoundWinner == CStrikeTeam.CT ? "Event.CTWin" : "Event.TERWin";
+        foreach (var client in _bridge.ClientManager.GetGameClients(true))
+            client.GetPlayerController()?.EmitSoundClient(winSound);
     }
 
     // ── bomb_planted ───────────────────────────────────────────────────────
