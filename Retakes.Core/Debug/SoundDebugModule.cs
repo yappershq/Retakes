@@ -1,15 +1,16 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Retakes.Plugins;
+using Sharp.Shared.Enums;
 using Sharp.Shared.HookParams;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Types;
 
 namespace Retakes.Debug;
 
-// ponytail: TEMPORARY diagnostic — hooks every native EmitSound/soundevent to log its name once
-// (deduped) so we can identify the real soundevent names for bomb-plant/freeze-beep/round-win
-// audio. Remove this module + its DI registration once #1 (Sounds) is implemented for real.
+// ponytail: keeps the dedup-log diagnostic from #1 (still useful while more sounds get wired up)
+// and additionally mutes bot/agent radio chatter voice lines, confirmed live 2026-07-02: any
+// soundevent name containing "radio" (sas.radio.locknload05, phoenix.radio_letsgo03/04, etc).
 internal sealed class SoundDebugModule : IModule
 {
     private readonly ILogger<SoundDebugModule> _logger;
@@ -42,6 +43,9 @@ internal sealed class SoundDebugModule : IModule
         if (_seen.Add(p.SoundName))
             _logger.LogInformation("[Retakes][SoundDebug] {Sound} (entity {Entity}, dur {Dur})",
                 p.SoundName, p.EntityIndex, p.SoundDuration);
+
+        if (p.SoundName.Contains("radio", System.StringComparison.OrdinalIgnoreCase))
+            return new HookReturnValue<SoundOpEventGuid>(EHookAction.SkipCallReturnOverride);
 
         return current;
     }

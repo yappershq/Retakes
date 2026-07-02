@@ -55,6 +55,9 @@ internal static class ModuleDependencyInjection
         services.AddSingleton<RoundFlowModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<RoundFlowModule>());
 
+        services.AddSingleton<RoundEventSuppressModule>();
+        services.AddSingleton<IModule>(sp => sp.GetRequiredService<RoundEventSuppressModule>());
+
         // B2: fallback weapon allocator — no-op when AllocatorModule is enabled
         services.AddSingleton<FallbackAllocationModule>();
         services.AddSingleton<IModule>(sp => sp.GetRequiredService<FallbackAllocationModule>());
