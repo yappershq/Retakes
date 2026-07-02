@@ -190,7 +190,7 @@ public class AllocatorSettings
 
     // Master toggle for the rich center-HTML bombsite announce (site image + live team counts).
     [JsonPropertyName("enable_bomb_site_announcement_center")]
-    public bool EnableBombSiteAnnouncementCenter { get; set; } = false;
+    public bool EnableBombSiteAnnouncementCenter { get; set; } = true;
 
     // When center-announce is on, show it only to CTs (retakers) — Ts get nothing.
     [JsonPropertyName("bomb_site_announcement_center_to_ct_only")]

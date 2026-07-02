@@ -88,6 +88,42 @@ internal sealed class QueueManager
     public int GetTargetNumCounterTerrorists()
         => Math.Max(0, ActiveCount - GetTargetNumTerrorists());
 
+    /// <summary>
+    /// Join-time capacity gate — mirrors MixScrims' "reject on join, don't accept-then-slay-later"
+    /// approach. Blocks a jointeam request outright when the roster is already full, or when the
+    /// requested team already holds its share of the (projected post-join) target split. Checked
+    /// BEFORE the player is admitted, unlike <see cref="GetTargetNumTerrorists"/> which describes
+    /// the already-active roster and would be circular if used for admission itself.
+    /// </summary>
+    public bool CanAcceptToTeam(CStrikeTeam team)
+    {
+        if (ActiveCount >= _config.Config.Game.MaxPlayers) return false;
+
+        var projectedTotal = ActiveCount + 1;
+        var shouldForceEven = _config.Config.Queue.ShouldForceEvenTeamsWhenPlayerCountIsMultipleOf10
+            && projectedTotal % 10 == 0;
+        var ratio = shouldForceEven ? 0.5f : _config.Config.Teams.TerroristRatio;
+
+        var targetT  = Math.Max(1, (int)MathF.Round(ratio * projectedTotal));
+        var targetCt = Math.Max(0, projectedTotal - targetT);
+
+        var (currentT, currentCt) = CountActiveByTeam();
+        return team == CStrikeTeam.TE ? currentT < targetT : currentCt < targetCt;
+    }
+
+    private (int t, int ct) CountActiveByTeam()
+    {
+        var t  = 0;
+        var ct = 0;
+        foreach (var slot in ActiveSlots)
+        {
+            var team = _bridge.ClientManager.GetGameClient(slot)?.GetPlayerController()?.Team;
+            if (team == CStrikeTeam.TE) t++;
+            else if (team == CStrikeTeam.CT) ct++;
+        }
+        return (t, ct);
+    }
+
     // ── queue management ───────────────────────────────────────────────────
 
     public void AddToQueue(PlayerSlot slot)

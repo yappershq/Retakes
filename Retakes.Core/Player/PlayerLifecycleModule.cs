@@ -139,11 +139,23 @@ internal sealed class PlayerLifecycleModule : IModule, IClientListener, IEventLi
 
         var currentTeam = client.GetPlayerController()?.Team ?? CStrikeTeam.Spectator;
 
-        // spectator → active team: enqueue if not already tracked, then let through.
+        // spectator → active team: reject outright if that team (or the whole roster) is already
+        // full instead of letting the engine seat them and relying on OnSpawnPost's after-the-fact
+        // slay. Matches MixScrims' join-gate — capacity checked BEFORE any state changes.
         if (currentTeam == CStrikeTeam.Spectator && requestedTeam != CStrikeTeam.Spectator)
         {
-            if (!QueueManager.IsActive(slot) && !QueueManager.IsQueued(slot))
-                QueueManager.AddToQueue(slot);
+            if (QueueManager.IsActive(slot))
+                return new HookReturnValue<bool>(EHookAction.Ignored); // already seated, no-op
+
+            if (!QueueManager.CanAcceptToTeam(requestedTeam))
+            {
+                if (!QueueManager.IsQueued(slot))
+                    QueueManager.AddToQueue(slot);
+                Loc.Chat(_bridge.LocalizerManager, client, "Retakes_Team_Full");
+                return new HookReturnValue<bool>(EHookAction.SkipCallReturnOverride, false);
+            }
+
+            QueueManager.AddToActive(slot);
             return new HookReturnValue<bool>(EHookAction.Ignored);
         }
 

@@ -8,6 +8,9 @@
   "Retakes_Queue_Joined": {
     "en-US": "{{green}}[Retakes]{{default}} You have joined the queue. Please wait for next round to begin."
   },
+  "Retakes_Team_Full": {
+    "en-US": "{{green}}[Retakes]{{default}} That team is full — you've been added to the queue."
+  },
   "Retakes_Round_Winner": {
     "en-US": "{{green}}[Retakes]{{default}} The {0} have won!"
   },
