@@ -97,16 +97,23 @@ internal sealed class SpawnManager
             var controller = client.GetPlayerController();
             if (controller is null || !controller.IsValid()) continue;
 
+            // Planter-ROLE assignment must not depend on the pawn already being alive at
+            // round_poststart — this fires right at round transition, before CS2 has necessarily
+            // respawned everyone yet, so a live T here could easily have IsAlive still false for
+            // one more tick. Assigning the role is cheap and BombModule re-validates aliveness
+            // fresh at freeze-end anyway. Only the actual teleport below needs a live pawn.
+            if (controller.Team == CStrikeTeam.TE && planterSpawn is not null && planterSteamId is null)
+                planterSteamId = steamId;
+
             var pawn = controller.GetPlayerPawn();
             if (pawn is null || !pawn.IsAlive) continue;
 
             if (controller.Team == CStrikeTeam.TE)
             {
                 Spawn? spawn;
-                if (planterSpawn is not null && planterSteamId is null)
+                if (planterSteamId == steamId)
                 {
-                    spawn         = planterSpawn;
-                    planterSteamId = steamId;
+                    spawn = planterSpawn;
                 }
                 else
                 {
